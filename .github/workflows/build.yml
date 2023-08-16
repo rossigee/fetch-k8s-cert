@@ -36,25 +36,14 @@ jobs:
       run: GOARCH=${{ matrix.arch }} go test -v
 
     - name: Determine packaging version number
+      id: pkgversion
       run: |
         version_line=$(head -n 1 "debian/changelog")
-        if [[ "$version_line" =~ ([0-9]+\.[0-9]+) ]]; then
-          version="${BASH_REMATCH[1]}"
-          echo "$version"
+        if [[ "$version_line" =~ ([0-9]+\.[0-9]+\-[0-9]+) ]]; then
+          echo "::set-output name=version::${BASH_REMATCH[1]}"
         else
-          echo "0.0-1"
+          echo "::set-output name=version::0.0-1"
         fi
-
-    - name: Packaging test
-      if: startsWith(github.ref, 'refs/tags/v')
-      uses: jiro4989/build-deb-action@v3
-      with:
-        package: fetch-k8s-script
-        maintainer: Ross Golder
-        version: 0.0.1-${{ github.ref_name }}
-        arch: '${{ matrix.arch }}'
-        depends: 'libc6 (>= 2.2.1)'
-        desc: 'App to retrieve TLS certificate from K8S cluster.'
 
     - name: Package release for Ubuntu
       if: startsWith(github.ref, 'refs/tags/v')
@@ -62,7 +51,7 @@ jobs:
       with:
         package: fetch-k8s-script
         maintainer: Ross Golder
-        version: ${{ github.ref_name }}
+        version: '${{ steps.pkgversion.outputs.version }}'
         arch: '${{ matrix.arch }}'
         depends: 'libc6 (>= 2.2.1)'
         desc: 'App to retrieve TLS certificate from K8S cluster.'

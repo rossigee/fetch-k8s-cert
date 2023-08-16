@@ -32,27 +32,37 @@ jobs:
       run: GOARCH=${{ matrix.arch }} go build -v -o fetch-k8s-cert
 
     - name: Run test
-      if: matrix.arch == 'amd64'
+      if: matrix.arch == 'amd64' # Until we can test on other archs
       run: GOARCH=${{ matrix.arch }} go test -v
 
-    - name: Packaging test
-      if: contains(['master', 'develop'], github.ref_name )
-      uses: jiro4989/build-deb-action@v3
-      with:
-        package: fetch-k8s-script
-        maintainer: Ross Golder
-        version: ${{ github.ref }} # refs/tags/v*.*.*
-        arch: '${{ matrix.arch }}'
-        depends: 'libc6 (>= 2.2.1)'
-        desc: 'App to retrieve TLS certificate from K8S cluster.'
+    - name: Determine packaging version number
+      run: |
+        version_line=$(head -n 1 "debian/changelog")
+        if [[ "$version_line" =~ ([0-9]+\.[0-9]+) ]]; then
+          version="${BASH_REMATCH[1]}"
+          echo "$version"
+        else
+          echo "0.0-1"
+        fi
 
-    - name: Package for Ubuntu
+    - name: Packaging test
       if: startsWith(github.ref, 'refs/tags/v')
       uses: jiro4989/build-deb-action@v3
       with:
         package: fetch-k8s-script
         maintainer: Ross Golder
-        version: ${{ github.ref }} # refs/tags/v*.*.*
+        version: 0.0.1-${{ github.ref_name }}
+        arch: '${{ matrix.arch }}'
+        depends: 'libc6 (>= 2.2.1)'
+        desc: 'App to retrieve TLS certificate from K8S cluster.'
+
+    - name: Package release for Ubuntu
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: jiro4989/build-deb-action@v3
+      with:
+        package: fetch-k8s-script
+        maintainer: Ross Golder
+        version: ${{ github.ref_name }}
         arch: '${{ matrix.arch }}'
         depends: 'libc6 (>= 2.2.1)'
         desc: 'App to retrieve TLS certificate from K8S cluster.'

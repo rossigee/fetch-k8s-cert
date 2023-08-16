@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - 'master'
+      - 'develop'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        go_version:
+          - 1.20
+        arch:
+          - amd64
+          - arm64
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Build for ${{ matrix.arch }}
+      run: GOARCH=${{ matrix.arch }} go build -v -o fetch-k8s-cert
+      
+    - name: Run test
+      run: GOARCH=${{ matrix.arch }} go test -v
+
+    - name: Package for Debian
+      uses: jiro4989/build-deb-action@v3
+      with:
+        package: fetch-k8s-script
+        maintainer: Ross Golder
+        version: ${{ github.ref }} # refs/tags/v*.*.*
+        arch: '${{ matrix.arch }}'
+        depends: 'libc6 (>= 2.2.1), git'
+        desc: 'App to retrieve TLS certificate from K8S cluster.'

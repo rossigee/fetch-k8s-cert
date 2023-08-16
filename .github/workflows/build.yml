@@ -18,7 +18,7 @@ jobs:
           - arm64
 
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout source
       uses: actions/checkout@v3
@@ -30,17 +30,29 @@ jobs:
 
     - name: Build for ${{ matrix.arch }}
       run: GOARCH=${{ matrix.arch }} go build -v -o fetch-k8s-cert
-      
+
     - name: Run test
-      if: matrix.arch == 'arm64'
+      if: matrix.arch == 'amd64'
       run: GOARCH=${{ matrix.arch }} go test -v
 
-    - name: Package for Debian
+    - name: Packaging test
+      if: contains(['master', 'develop'], github.ref_name )
       uses: jiro4989/build-deb-action@v3
       with:
         package: fetch-k8s-script
         maintainer: Ross Golder
         version: ${{ github.ref }} # refs/tags/v*.*.*
         arch: '${{ matrix.arch }}'
-        depends: 'libc6 (>= 2.2.1), git'
+        depends: 'libc6 (>= 2.2.1)'
+        desc: 'App to retrieve TLS certificate from K8S cluster.'
+
+    - name: Package for Ubuntu
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: jiro4989/build-deb-action@v3
+      with:
+        package: fetch-k8s-script
+        maintainer: Ross Golder
+        version: ${{ github.ref }} # refs/tags/v*.*.*
+        arch: '${{ matrix.arch }}'
+        depends: 'libc6 (>= 2.2.1)'
         desc: 'App to retrieve TLS certificate from K8S cluster.'

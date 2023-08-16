@@ -10,3 +10,4 @@ Package: fetch-k8s-cert
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Small tool to mirror a K8S Certificate resource to a local PEM file
+Pre-Depends: adduser

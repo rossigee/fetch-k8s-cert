@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=nobody
+User=fetch-k8s-cert
 WorkingDirectory=/tmp
 ExecStart=/usr/bin/fetch-k8s-cert -c /etc/fetch-k8s-cert.conf
 

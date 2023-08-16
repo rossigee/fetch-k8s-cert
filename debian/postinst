@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        adduser --system --no-create-home --group fetch-k8s-cert
+        ;;
+esac
+exit 0

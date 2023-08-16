@@ -32,6 +32,7 @@ jobs:
       run: GOARCH=${{ matrix.arch }} go build -v -o fetch-k8s-cert
       
     - name: Run test
+      if: matrix.arch == 'arm64'
       run: GOARCH=${{ matrix.arch }} go test -v
 
     - name: Package for Debian

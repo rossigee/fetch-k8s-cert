@@ -1,0 +1,7 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# For some reason 'dwz' results in obscure error and failure
+override_dh_dwz:

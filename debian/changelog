@@ -1,0 +1,5 @@
+fetch-k8s-cert (1.0-1) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Ross Golder <ross@golder.org>  Tue, 15 Aug 2023 22:42:30 +0700

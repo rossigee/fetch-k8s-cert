@@ -1,0 +1,12 @@
+Source: fetch-k8s-cert
+Section: misc
+Priority: optional
+Maintainer: Ross Golder <ross@golder.org>
+Build-Depends: debhelper (>= 10)
+Standards-Version: 3.9.8
+Homepage: https://github.com/rossigee/fetch-k8s-cert
+
+Package: fetch-k8s-cert
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Small tool to mirror a K8S Certificate resource to a local PEM file

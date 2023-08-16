@@ -1,0 +1,9 @@
+[Unit]
+Description=Run fetch-k8s-cert every 20 minutes
+
+[Timer]
+OnCalendar=*:0/20
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

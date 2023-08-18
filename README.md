@@ -18,6 +18,12 @@ Create a configuration file in YAML format with the following fields:
 # URL of the Kubernetes API
 k8sAPIURL: https://your.cluster.address:6443
 
+# Path to the CA file for the K8S API server
+k8sCACertFile: /etc/pki/tls/ca.crt
+
+# Enable to skip TLS verification of the K8S API server
+skipTLSVerification: true
+
 # Base64-encoded authentication token
 token: jwt_token_from_service_account
 
@@ -34,12 +40,6 @@ localKeyFile: /etc/pki/tls/internal-key.pem
 
 # Command to trigger a service reload.
 reloadCommand: "echo 'The cert changed.'"
-
-# Path to the CA file for the K8S API server
-#caCertFilePath: /etc/pki/tls/ca.crt
-
-# Enable to skip TLS verification of the K8S API server
-skipTLSVerification: true
 ```
 
 Run the binary...

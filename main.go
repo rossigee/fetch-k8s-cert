@@ -20,6 +20,8 @@ var log = logrus.New()
 
 type Config struct {
 	K8SAPIURL           string `yaml:"k8sAPIURL"`
+	K8SCACertFile       string `yaml:"k8sCACertFile"`
+	SkipTLSVerification bool   `yaml:"skipTLSVerification"`
 	Token               string `yaml:"token"`
 	Namespace           string `yaml:"namespace"`
 	SecretName          string `yaml:"secretName"`
@@ -27,8 +29,6 @@ type Config struct {
 	LocalCertFile       string `yaml:"localCertFile"`
 	LocalKeyFile        string `yaml:"localKeyFile"`
 	ReloadCommand       string `yaml:"reloadCommand"`
-	CACertFilePath      string `yaml:"caCertFilePath"`
-	SkipTLSVerification bool   `yaml:"skipTLSVerification"`
 }
 
 type TLSBundle struct {
@@ -61,8 +61,8 @@ func getTLSCertData(config Config) (*TLSBundle, error) {
 		},
 	}
 
-	if !config.SkipTLSVerification && config.CACertFilePath != "" {
-		caCert, err := readFile(config.CACertFilePath)
+	if !config.SkipTLSVerification && config.K8SCACertFile != "" {
+		caCert, err := readFile(config.K8SCACertFile)
 		if err != nil {
 			return nil, fmt.Errorf("error reading CA certificate file: %v", err)
 		}

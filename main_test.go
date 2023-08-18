@@ -31,33 +31,29 @@ func (hook *TestHook) Levels() []logrus.Level {
 }
 
 func TestMainFunction_Success(t *testing.T) {
+	testCA := []byte("base64-encoded-ca\n")
+	encodedCA := base64.StdEncoding.EncodeToString(testCA)
 	testCert := []byte("base64-encoded-cert\n")
 	encodedCert := base64.StdEncoding.EncodeToString(testCert)
 	testKey := []byte("base64-encoded-key\n")
 	encodedKey := base64.StdEncoding.EncodeToString(testKey)
-	requestBody := fmt.Sprintf(`{"data": {"tls.crt": "%s", "tls.key": "%s"}}`, encodedCert, encodedKey)
-	expectedCertData := append(testKey, testCert...)
+	requestBody := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, encodedCA, encodedCert, encodedKey)
 
 	runTestWithConfig(t, requestBody, func(config Config) {
-		// Modify the config to intentionally cause a failure
-		config.LocalFilePath = "nonexistent-file.pem"
-
 		mainWithConfig(config)
 
-		certFile, err := os.Open(config.LocalFilePath)
+		caFile, err := os.Open(config.LocalCAFile)
 		if err != nil {
-			t.Fatalf("Failed to open certificate file: %v", err)
+			t.Fatalf("Failed to open CA certificate file: %v", err)
 		}
-		defer certFile.Close()
-
-		var certData bytes.Buffer
-		_, err = io.Copy(&certData, certFile)
+		defer caFile.Close()
+		var caData bytes.Buffer
+		_, err = io.Copy(&caData, caFile)
 		if err != nil {
-			t.Fatalf("Failed to read certificate data: %v", err)
+			t.Fatalf("Failed to read CA certificate data: %v", err)
 		}
-
-		if !bytes.Equal(certData.Bytes(), expectedCertData) {
-			t.Errorf("Certificate data does not match expected")
+		if !bytes.Equal(caData.Bytes(), testCA) {
+			t.Errorf("CA certificate data does not match expected")
 		}
 	})
 }
@@ -66,15 +62,16 @@ func TestMainFunction_Failure(t *testing.T) {
 	hook := &TestHook{}
 	log.AddHook(hook)
 
+	testCA := []byte("base64-encoded-ca\n")
 	testCert := []byte("base64-encoded-cert\n")
 	testKey := []byte("base64-encoded-key\n")
-	requestBody := fmt.Sprintf(`{"data": {"tls.crt": "%s", "tls.key": "%s"}}`, testCert, testKey)
+	requestBody := fmt.Sprintf(`{"data": {"ca.cert": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, testCA, testCert, testKey)
 
 	runTestWithConfig(t, requestBody, func(config Config) {
 		mainWithConfig(config)
 
 		// Check if the expected error message is logged
-		if !containsLogMessage(hook.Messages, "Error extracting certificate and key: invalid character '\\n' in string literal") {
+		if !containsLogMessage(hook.Messages, "Error retrieving TLS credentials from Kubernetes API: invalid character '\\n' in string literal") {
 			t.Errorf("Expected error message not found in logs")
 		}
 	})
@@ -84,20 +81,22 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 	hook := &TestHook{}
 	log.AddHook(hook)
 
+	testCA := []byte("base64-encoded-ca\n")
+	encodedCA := base64.StdEncoding.EncodeToString(testCA)
 	testCert := []byte("base64-encoded-cert\n")
 	encodedCert := base64.StdEncoding.EncodeToString(testCert)
 	testKey := []byte("base64-encoded-key\n")
 	encodedKey := base64.StdEncoding.EncodeToString(testKey)
-	requestBody := fmt.Sprintf(`{"data": {"tls.crt": "%s", "tls.key": "%s"}}`, encodedCert, encodedKey)
+	requestBody := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, encodedCA, encodedCert, encodedKey)
 
 	runTestWithConfig(t, requestBody, func(config Config) {
 		// Modify the config to use an invalid token
-		config.LocalFilePath = "/etc/shadow"
+		config.LocalCAFile = "/etc/shadow"
 
 		mainWithConfig(config)
 
 		// Check if the expected error message is logged
-		if !containsLogMessage(hook.Messages, "Error reading local cert file: open /etc/shadow: permission denied") {
+		if !containsLogMessage(hook.Messages, "Unable to update local CA file: open /etc/shadow: permission denied") {
 			t.Errorf("Expected error message not found in logs")
 		}
 	})
@@ -136,14 +135,18 @@ func runTestWithConfig(t *testing.T, requestBody string, testFunc func(config Co
 	mockServer := createMockServer(http.StatusOK, requestBody)
 	defer mockServer.Close()
 
+	caFilePath := filepath.Join(tempDir, "test-ca.pem")
 	certFilePath := filepath.Join(tempDir, "test-cert.pem")
+	keyFilePath := filepath.Join(tempDir, "test-key.pem")
 
 	testConfig := Config{
 		K8SAPIURL:     mockServer.URL,
 		Token:         base64.StdEncoding.EncodeToString([]byte("test-token")),
 		Namespace:     "test-namespace",
 		CertName:      "test-cert-name",
-		LocalFilePath: certFilePath,
+		LocalCAFile:   caFilePath,
+		LocalCertFile: certFilePath,
+		LocalKeyFile:  keyFilePath,
 		ReloadCommand: "echo test-reload",
 	}
 

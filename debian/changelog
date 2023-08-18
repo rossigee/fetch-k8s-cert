@@ -1,5 +1,12 @@
+fetch-k8s-cert (1.1-1) unstable; urgency=medium
+
+  * Manage all three TLS files; CA, cert and key.
+
+ -- Ross Golder <ross@golder.org>  Tue, 18 Aug 2023 11:37:17 +0700
+
 fetch-k8s-cert (1.0-1) unstable; urgency=medium
 
   * Initial release.
 
  -- Ross Golder <ross@golder.org>  Tue, 15 Aug 2023 22:42:30 +0700
+

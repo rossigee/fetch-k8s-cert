@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -24,10 +23,18 @@ type Config struct {
 	Token               string `yaml:"token"`
 	Namespace           string `yaml:"namespace"`
 	CertName            string `yaml:"certName"`
-	LocalFilePath       string `yaml:"localFilePath"`
+	LocalCAFile         string `yaml:"localCAFile"`
+	LocalCertFile       string `yaml:"localCertFile"`
+	LocalKeyFile        string `yaml:"localKeyFile"`
 	ReloadCommand       string `yaml:"reloadCommand"`
 	CACertFilePath      string `yaml:"caCertFilePath"`
 	SkipTLSVerification bool   `yaml:"skipTLSVerification"`
+}
+
+type TLSBundle struct {
+	CAData   []byte
+	CertData []byte
+	KeyData  []byte
 }
 
 func loadConfigFromFile(filePath string) (*Config, error) {
@@ -45,7 +52,7 @@ func loadConfigFromFile(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-func getTLSCertData(config Config) ([]byte, error) {
+func getTLSCertData(config Config) (*TLSBundle, error) {
 	url := fmt.Sprintf("%s/api/v1/namespaces/%s/secrets/%s", config.K8SAPIURL, config.Namespace, config.CertName)
 
 	tr := &http.Transport{
@@ -88,43 +95,50 @@ func getTLSCertData(config Config) ([]byte, error) {
 		return nil, err
 	}
 
-	certData, keyData, err := extractCertKeyFromSecret(secretData)
+	tlsBundle, err := extractTLSBundleFromSecret(secretData)
 	if err != nil {
 		return nil, err
 	}
 
-	pemCert := append(keyData, certData...)
-
-	return pemCert, nil
+	return tlsBundle, nil
 }
 
-func extractCertKeyFromSecret(secretData []byte) ([]byte, []byte, error) {
+func extractTLSBundleFromSecret(secretData []byte) (*TLSBundle, error) {
 	var secret struct {
 		Data map[string]string `json:"data"`
 	}
 
 	err := json.Unmarshal(secretData, &secret)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
+	caData, foundCa := secret.Data["ca.crt"]
 	certData, foundCert := secret.Data["tls.crt"]
 	keyData, foundKey := secret.Data["tls.key"]
-	if !foundCert || !foundKey {
-		return nil, nil, fmt.Errorf("TLS certificate or key not found in secret data")
+	if !foundCa || !foundCert || !foundKey {
+		return nil, fmt.Errorf("TLS certificate or key not found in secret data")
 	}
 
+	decodedCA, err := base64.StdEncoding.DecodeString(caData)
+	if err != nil {
+		return nil, err
+	}
 	decodedCert, err := base64.StdEncoding.DecodeString(certData)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
 	decodedKey, err := base64.StdEncoding.DecodeString(keyData)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return decodedCert, decodedKey, nil
+	tlsBundle := TLSBundle{
+		decodedCA,
+		decodedCert,
+		decodedKey,
+	}
+	return &tlsBundle, nil
 }
 
 func readFile(filePath string) ([]byte, error) {
@@ -137,19 +151,61 @@ func readFile(filePath string) ([]byte, error) {
 	return io.ReadAll(file)
 }
 
-func writeCertToFile(certData []byte, filePath string) error {
-	file, err := os.Create(filePath)
+func writeToFile(data []byte, filePath string, permissions os.FileMode) error {
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, permissions)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	_, err = file.Write(certData)
+	_, err = file.Write(data)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func updateFileIfDifferent(filePath string, data []byte, permissions os.FileMode) (bool, error) {
+	// Read the current content of the file
+	currentData, err := readFile(filePath)
+	if err != nil && os.IsNotExist(err) {
+		// Handle case where local file doesn't exist
+		err = writeToFile(data, filePath, permissions)
+		if err != nil {
+			log.Errorf("Error writing client certificate to local file: %v", err)
+		}
+		return false, err
+	} else if err != nil {
+		// Handle other error reading local file
+		log.Errorf("Error reading local client certificate file: %v", err)
+		return false, err
+	}
+
+	// Compare the current content with the new data
+	if bytesEqual(currentData, data) {
+		return false, nil // Content matches, no need to update
+	}
+
+	// Update the file with the new data
+	err = writeToFile(data, filePath, permissions)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil // Updated the file
+}
+
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func triggerReload(command string) {
@@ -191,36 +247,33 @@ func main() {
 }
 
 func mainWithConfig(config Config) {
-	certData, err := getTLSCertData(config)
+	tlsBundle, err := getTLSCertData(config)
 	if err != nil {
-		log.Errorf("Error extracting certificate and key: %v", err)
+		log.Errorf("Error retrieving TLS credentials from Kubernetes API: %v", err)
 		return
 	}
 
-	localCertData, err := readFile(config.LocalFilePath)
-	if err != nil && os.IsNotExist(err) {
-		// Handle case where local file doesn't exist
-		err = writeCertToFile(certData, config.LocalFilePath)
-		if err != nil {
-			log.Errorf("Error writing cert and key to local file: %v", err)
-		}
+	certPermissions := os.FileMode(0644) // world-readable
+	keyPermissions := os.FileMode(0640)  // group-readable
+
+	caChanged, err := updateFileIfDifferent(config.LocalCAFile, tlsBundle.CAData, certPermissions)
+	if err != nil {
+		log.Errorf("Unable to update local CA file: %v", err)
 		return
-	} else if err != nil {
-		// Handle other error reading local file
-		log.Errorf("Error reading local cert file: %v", err)
+	}
+	certChanged, err := updateFileIfDifferent(config.LocalCertFile, tlsBundle.CertData, certPermissions)
+	if err != nil {
+		log.Errorf("Unable to update local cert file: %v", err)
+		return
+	}
+	keyChanged, err := updateFileIfDifferent(config.LocalKeyFile, tlsBundle.KeyData, keyPermissions)
+	if err != nil {
+		log.Errorf("Unable to update local key file: %v", err)
 		return
 	}
 
-	if !bytes.Equal(certData, localCertData) {
-		// Certificate data has changed, update the file
-		err = writeCertToFile(certData, config.LocalFilePath)
-		if err != nil {
-			log.Errorf("Error writing updated cert and key to local file: %v", err)
-			return
-		}
-
+	if caChanged || certChanged || keyChanged {
+		log.Info("TLS details updated. Running reload command.")
 		triggerReload(config.ReloadCommand)
-	} else {
-		log.Info("Certificate and key contents are the same. No action needed.")
 	}
 }

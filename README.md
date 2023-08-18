@@ -27,8 +27,10 @@ namespace: internal
 # Name of the certificate resource
 certName: internal-tls
 
-# Path to the local certificate file.
-localFilePath: /etc/pki/tls/internal-tls.pem
+# Path to the local TLS files.
+localCAFile: /etc/pki/tls/internal-ca.pem
+localCertFile: /etc/pki/tls/internal-cert.pem
+localKeyFile: /etc/pki/tls/internal-key.pem
 
 # Command to trigger a service reload.
 reloadCommand: "echo 'The cert changed.'"

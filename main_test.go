@@ -143,7 +143,7 @@ func runTestWithConfig(t *testing.T, requestBody string, testFunc func(config Co
 		K8SAPIURL:     mockServer.URL,
 		Token:         base64.StdEncoding.EncodeToString([]byte("test-token")),
 		Namespace:     "test-namespace",
-		CertName:      "test-cert-name",
+		SecretName:    "test-secret-name",
 		LocalCAFile:   caFilePath,
 		LocalCertFile: certFilePath,
 		LocalKeyFile:  keyFilePath,

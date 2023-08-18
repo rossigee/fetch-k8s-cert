@@ -22,7 +22,7 @@ type Config struct {
 	K8SAPIURL           string `yaml:"k8sAPIURL"`
 	Token               string `yaml:"token"`
 	Namespace           string `yaml:"namespace"`
-	CertName            string `yaml:"certName"`
+	SecretName          string `yaml:"secretName"`
 	LocalCAFile         string `yaml:"localCAFile"`
 	LocalCertFile       string `yaml:"localCertFile"`
 	LocalKeyFile        string `yaml:"localKeyFile"`
@@ -53,7 +53,7 @@ func loadConfigFromFile(filePath string) (*Config, error) {
 }
 
 func getTLSCertData(config Config) (*TLSBundle, error) {
-	url := fmt.Sprintf("%s/api/v1/namespaces/%s/secrets/%s", config.K8SAPIURL, config.Namespace, config.CertName)
+	url := fmt.Sprintf("%s/api/v1/namespaces/%s/secrets/%s", config.K8SAPIURL, config.Namespace, config.SecretName)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{

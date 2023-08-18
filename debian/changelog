@@ -1,3 +1,9 @@
+fetch-k8s-cert (1.2-1) unstable; urgency=medium
+
+  * Change 'certName' to 'secretName' to avoid confusion.
+
+ -- Ross Golder <ross@golder.org>  Tue, 18 Aug 2023 14:21:25 +0700
+
 fetch-k8s-cert (1.1-1) unstable; urgency=medium
 
   * Manage all three TLS files; CA, cert and key.

@@ -1,2 +1,5 @@
 fetch-k8s-cert
 config.yaml
+debian/fetch-k8s-cert.substvars
+debian/files
+

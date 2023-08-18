@@ -24,8 +24,8 @@ token: jwt_token_from_service_account
 # Kubernetes namespace where the certificate is located
 namespace: internal
 
-# Name of the certificate resource
-certName: internal-tls
+# Name of the secret resource containing the certificate details
+secretName: internal-tls
 
 # Path to the local TLS files.
 localCAFile: /etc/pki/tls/internal-ca.pem

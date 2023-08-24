@@ -6,6 +6,7 @@ on:
     branches:
       - 'master'
       - 'develop'
+      - 'ci-work'
 
 jobs:
   build:
@@ -50,6 +51,7 @@ jobs:
         fi
 
     - name: Package release for Ubuntu
+      if: matrix.arch != 'windows' # Some things were just not meant to be
       uses: jiro4989/build-deb-action@v3
       with:
         package: fetch-k8s-script

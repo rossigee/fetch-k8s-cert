@@ -16,6 +16,7 @@ jobs:
         arch:
           - amd64
           - arm64
+          - windows
 
     runs-on: ubuntu-latest
 
@@ -28,12 +29,15 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Build for ${{ matrix.arch }}
-      run: GOARCH=${{ matrix.arch }} go build -v -o fetch-k8s-cert
-
-    - name: Run test
+    - name: Run tests
       if: matrix.arch == 'amd64' # Until we can test on other archs
-      run: GOARCH=${{ matrix.arch }} go test -v
+      run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go test -v
+
+    - name: Build binary for ${{ matrix.arch }}
+      run: |
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o fetch-k8s-cert_${{ matrix.goos }}_${{ matrix.goarch }}${{ matrix.ext }}
+        [ -d artifacts ] || mkdir artifacts
+        mv fetch-k8s-cert_* artifacts/
 
     - name: Determine packaging version number
       id: pkgversion

@@ -8,11 +8,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: ./.github/workflows/build.yml
+
+    - name: Publish Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/*
+        tag_name: v${{ github.run_number }}
+        title: Release v${{ github.run_number }}
 
     - name: Create Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "*.deb"
+        artifacts: "artifacts/*.deb"

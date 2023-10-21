@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         go_version:
-          - 1.20
+          - 1.21
         arch:
           - amd64
           - arm64
@@ -55,3 +55,4 @@ jobs:
         dh_builddeb
         [ -d artifacts ] || mkdir artifacts
         mv ../fetch-k8s-cert_* artifacts/
+      if: matrix.arch != 'windows'

@@ -51,7 +51,7 @@ jobs:
 
     - name: Package release for Ubuntu
       run: |
-        apt-get install -y debhelper
+        sudo apt-get update && sudo apt-get install -y debhelper
         dh_builddeb
         [ -d artifacts ] || mkdir artifacts
         mv ../fetch-k8s-cert_* artifacts/

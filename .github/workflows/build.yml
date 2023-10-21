@@ -50,11 +50,7 @@ jobs:
         fi
 
     - name: Package release for Ubuntu
-      uses: jiro4989/build-deb-action@v3
-      with:
-        package: fetch-k8s-script
-        maintainer: Ross Golder
-        version: '${{ steps.pkgversion.outputs.version }}'
-        arch: '${{ matrix.arch }}'
-        depends: 'libc6 (>= 2.2.1)'
-        desc: 'App to retrieve TLS certificate from K8S cluster.'
+      run: |
+        dh_builddeb
+        [ -d artifacts ] || mkdir artifacts
+        mv ../fetch-k8s-cert_* artifacts/

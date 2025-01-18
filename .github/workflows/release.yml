@@ -103,7 +103,7 @@ jobs:
 
       - name: Setup packaging environment
         run: |
-          sudo apt-get install -y build-essential debhelper devscripts
+          sudo apt-get install -y build-essential debhelper devscripts rpm
 
       - name: Run tests
         run: |
@@ -117,37 +117,40 @@ jobs:
       - name: Build DEB packages
         run: |
           dpkg-buildpackage && (
-            mkdir -p debian/artifacts
-            mv ../*.deb ../*.changes ../*.dsc ../*.tar.gz ./debian/artifacts
-            ls -l ./debian/artifacts
+            mkdir -p artifacts
+            mv ../*.deb ../*.changes ../*.dsc ../*.tar.gz ./artifacts
+            ls -l ./artifacts
           )
 
-      # - name: Build RPM packages
-      #   uses: jiro4989/build-rpm-action@v2
-      #   with:
-      #     summary: '${{ env.DESC }}'
-      #     package: ${{ env.APP_NAME }}
-      #     package_root: .rpmpkg
-      #     maintainer: ${{ env.MAINTAINER }}
-      #     version: ${{ github.ref }}
-      #     arch: '${{ matrix.arch }}'
-      #     desc: '${{ env.DESC }}'
-      #     homepage: 'https://github.com/rossigee/fetch-k8s-cert'
+      - name: Build RPM packages
+        run: |
+          mkdir -p ~/rpmbuild/SPECS ~/rpmbuild/SOURCES
+          appid=${{ env.APP_NAME }}-${{ env.APP_VERSION }}
+          cp -r ../fetch-k8s-cert /tmp/${appid} && (
+            cd /tmp
+            tar cf - ${appid} | bzip2 > ~/rpmbuild/SOURCES/${appid}.tar.bz2
+          )
+          sed 's/(^Version:[[:space:]]*).*/\1${{github.ref_name}}/' \
+            < rpmbuild/SPECS/${appid}.spec \
+            > ~/rpmbuild/SPECS/${appid}.spec
+          rpmbuild -bb ~/rpmbuild/SPECS/${appid}.spec && (
+            mkdir -p artifacts
+            mv ~/rpmbuild/RPMS/*.rpm ./artifacts
+            ls -l ./artifacts
+          )
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
           name: artifact-deb
-          path: |
-            debian/artifacts/*.deb
+          path: artifacts/*.deb
 
-      # - name: Upload RPM artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: artifact-rpm
-      #     path: |
-      #       ./*.rpm
-      #       !./*-debuginfo-*.rpm
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-rpm
+          path: artifacts/*.rpm
+          #path: rpmbuild/RPMS/${{ env.ARCH }}/*.rpm
 
   create-release:
     runs-on: ubuntu-latest

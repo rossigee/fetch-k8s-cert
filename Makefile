@@ -8,6 +8,9 @@ build: clean
 	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY_NAME)_linux_arm64
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY_NAME)_windows_amd64.exe
 
+package:
+	dpkg-buildpackage
+
 clean:
 	rm -f $(BINARY_NAME)_*
 

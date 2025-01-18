@@ -91,12 +91,12 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 
 	runTestWithConfig(t, requestBody, func(config Config) {
 		// Modify the config to use an invalid token
-		config.LocalCAFile = "/etc/shadow"
+		config.LocalCAFile = "/etc/hosts"
 
 		mainWithConfig(config)
 
 		// Check if the expected error message is logged
-		if !containsLogMessage(hook.Messages, "Unable to update local CA file: open /etc/shadow: permission denied") {
+		if !containsLogMessage(hook.Messages, "Unable to update local CA file: open /etc/hosts: permission denied") {
 			t.Errorf("Expected error message not found in logs")
 		}
 	})

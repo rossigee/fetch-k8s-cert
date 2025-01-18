@@ -80,13 +80,15 @@ jobs:
             dist/*.zip
 
   build-linux-packages:
-    runs-on: ubuntu-latest
+    runs-on: "${{ matrix.runner }}"
 
     strategy:
       matrix:
-        arch:
-          - amd64
-          - arm64
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
 
     needs:
       - build-binary-packages

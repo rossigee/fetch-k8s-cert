@@ -1,4 +1,4 @@
-fetch-k8s-cert usr/bin/
+build/linux/amd64/fetch-k8s-cert usr/bin/
 systemd/fetch-k8s-cert.service usr/lib/systemd/system/
 systemd/fetch-k8s-cert.timer usr/lib/systemd/system/
 README.md usr/share/doc/fetch-k8s-cert/

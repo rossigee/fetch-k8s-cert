@@ -1,18 +1,19 @@
+---
 name: Build
 
 on:
   workflow_call:
   push:
     branches:
-      - 'master'
-      - 'develop'
+      - "master"
+      - "develop"
 
 jobs:
   build:
     strategy:
       matrix:
-        go_version:
-          - 1.21
+        # go_version:
+        #   - 1.23
         arch:
           - amd64
           - arm64
@@ -21,38 +22,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout source
-      uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version-file: 'go.mod'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
 
-    - name: Run tests
-      if: matrix.arch == 'amd64' # Until we can test on other archs
-      run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go test -v
+      - name: Run tests
+        if: matrix.arch == 'amd64' # Until we can test on other archs
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go test -v
 
-    - name: Build binary for ${{ matrix.arch }}
-      run: |
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o fetch-k8s-cert_${{ matrix.goos }}_${{ matrix.goarch }}${{ matrix.ext }}
-        [ -d artifacts ] || mkdir artifacts
-        mv fetch-k8s-cert_* artifacts/
-
-    - name: Determine packaging version number
-      id: pkgversion
-      run: |
-        version_line=$(head -n 1 "debian/changelog")
-        if [[ "$version_line" =~ ([0-9]+\.[0-9]+\-[0-9]+) ]]; then
-          echo "::set-output name=version::${BASH_REMATCH[1]}"
-        else
-          echo "::set-output name=version::0.0-1"
-        fi
-
-    - name: Package release for Ubuntu
-      run: |
-        sudo apt-get update && sudo apt-get install -y debhelper
-        dpkg-buildpackage
-        [ -d artifacts ] || mkdir artifacts
-        mv ../fetch-k8s-cert_* artifacts/
-      if: matrix.arch != 'windows'
+      - name: Build binary for ${{ matrix.goos }}/${{ matrix.arch }}
+        run: |
+          [ -d build/${{ matrix.goos }}/${{ matrix.arch }} ] || mkdir build/${{ matrix.goos }}/${{ matrix.arch }}
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.goos }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}

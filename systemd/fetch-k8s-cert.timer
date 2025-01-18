@@ -1,5 +1,5 @@
 [Unit]
-Description=Run fetch-k8s-cert every 20 minutes
+Description=Fetch K8S TLS certificate every 20 minutes
 
 [Timer]
 OnCalendar=*:0/20

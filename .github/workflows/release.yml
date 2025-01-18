@@ -91,6 +91,9 @@ jobs:
             runner: ubuntu-24.04-arm
 
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
       - name: Build DEB packages
         uses: rossigee/gha-build-dpkg@v1
         id: build

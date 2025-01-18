@@ -131,7 +131,7 @@ jobs:
             tar cf - ${appid} | bzip2 > ~/rpmbuild/SOURCES/${appid}.tar.bz2
           )
           sed 's/(^Version:[[:space:]]*).*/\1${{github.ref_name}}/' \
-            < rpmbuild/SPECS/${appid}.spec \
+            < rpmbuild/SPECS/${{ env.APP_NAME }}.spec \
             > ~/rpmbuild/SPECS/${appid}.spec
           rpmbuild -bb ~/rpmbuild/SPECS/${appid}.spec && (
             mkdir -p artifacts

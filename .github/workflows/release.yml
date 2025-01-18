@@ -43,7 +43,7 @@ jobs:
 
       - name: Build binary for ${{ matrix.os }}/${{ matrix.arch }}
         run: |
-          [ -d build/${{ matrix.os }}/${{ matrix.arch }} ] || mkdir build/${{ matrix.os }}/${{ matrix.arch }}
+          [ -d build/${{ matrix.os }}/${{ matrix.arch }} ] || mkdir -p build/${{ matrix.os }}/${{ matrix.arch }}
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.os }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}
 
       - name: Determine packaging version number

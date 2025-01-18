@@ -90,9 +90,6 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
 
-    needs:
-      - build-binary-packages
-
     steps:
       - name: Build DEB packages
         uses: rossigee/gha-build-dpkg@v1

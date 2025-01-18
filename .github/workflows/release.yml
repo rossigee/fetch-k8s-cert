@@ -93,30 +93,41 @@ jobs:
 
     steps:
       - name: Build DEB packages
-        uses: jiro4989/build-deb-action@v4
+        uses: jtdor/build-deb-action@v1
+        env:
+          DEB_BUILD_OPTIONS: noautodbgsym
         with:
-          package: ${{ env.APP_NAME }}
-          maintainer: ${{ env.MAINTAINER }}
-          version: ${{ github.ref }}
-          arch: '${{ matrix.arch }}'
-          desc: '${{ env.DESC }}'
+          buildpackage-opts: --build=binary --no-sign
+
+      # - name: Build DEB packages
+      #   uses: jiro4989/build-deb-action@v4
+      #   with:
+      #     package: ${{ env.APP_NAME }}
+      #     package_root: .debian/fetch-k8s-cert
+      #     maintainer: ${{ env.MAINTAINER }}
+      #     version: ${{ github.ref }}
+      #     arch: '${{ matrix.arch }}'
+      #     desc: '${{ env.DESC }}'
+      #     homepage: 'https://github.com/rossigee/fetch-k8s-cert'
 
       # - name: Build RPM packages
       #   uses: jiro4989/build-rpm-action@v2
       #   with:
       #     summary: '${{ env.DESC }}'
       #     package: ${{ env.APP_NAME }}
+      #     package_root: .rpmpkg
       #     maintainer: ${{ env.MAINTAINER }}
       #     version: ${{ github.ref }}
       #     arch: '${{ matrix.arch }}'
       #     desc: '${{ env.DESC }}'
+      #     homepage: 'https://github.com/rossigee/fetch-k8s-cert'
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
           name: artifact-deb
           path: |
-            ./*.deb
+            debian/artifacts/*.deb
 
       # - name: Upload RPM artifact
       #   uses: actions/upload-artifact@v4

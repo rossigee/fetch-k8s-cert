@@ -58,7 +58,7 @@ jobs:
 
       - name: Create distribution files
         run: |
-          [ -d dist ] || mkdir dist }}
+          [ -d dist ] || mkdir dist
           cp -r build/${{ matrix.os }}/${{ matrix.arch }}/* dist
           (
             cd dist

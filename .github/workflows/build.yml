@@ -34,9 +34,9 @@ jobs:
       - name: Run tests
         #if: matrix.arch == 'amd64' # Until we can test on other archs
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.arch }} go test -v
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go test -v
 
-      - name: Build binary for ${{ matrix.goos }}/${{ matrix.arch }}
+      - name: Build binary for ${{ matrix.os }}/${{ matrix.arch }}
         run: |
-          [ -d build/${{ matrix.goos }}/${{ matrix.arch }} ] || mkdir build/${{ matrix.goos }}/${{ matrix.arch }}
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.goos }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}
+          [ -d build/${{ matrix.os }}/${{ matrix.arch }} ] || mkdir build/${{ matrix.goos }}/${{ matrix.arch }}
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.goos }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}

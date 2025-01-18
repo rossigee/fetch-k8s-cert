@@ -96,7 +96,6 @@ jobs:
         uses: jiro4989/build-deb-action@v4
         with:
           package: ${{ env.APP_NAME }}
-          package_root: .debpkg
           maintainer: ${{ env.MAINTAINER }}
           version: ${{ github.ref }}
           arch: '${{ matrix.arch }}'
@@ -107,7 +106,6 @@ jobs:
       #   with:
       #     summary: '${{ env.DESC }}'
       #     package: ${{ env.APP_NAME }}
-      #     package_root: .rpmpkg
       #     maintainer: ${{ env.MAINTAINER }}
       #     version: ${{ github.ref }}
       #     arch: '${{ matrix.arch }}'

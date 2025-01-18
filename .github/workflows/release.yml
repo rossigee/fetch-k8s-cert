@@ -37,7 +37,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Run tests
-        #if: matrix.arch == 'amd64' # Until we can test on other archs
+        if: matrix.arch == 'amd64' # Until we can test on other archs
         run: |
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go test -v
 

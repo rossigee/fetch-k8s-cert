@@ -117,9 +117,9 @@ jobs:
       - name: Build DEB packages
         run: |
           dpkg-buildpackage && (
-            mkdir -p artifacts
-            mv ../*.deb ../*.changes ../*.dsc ../*.tar.gz ./artifacts
-            ls -l ./artifacts
+            mkdir -p debian/artifacts
+            mv ../*.deb ../*.changes ../*.dsc ../*.tar.gz ./debian/artifacts
+            ls -l ./debian/artifacts
           )
 
       # - name: Build RPM packages

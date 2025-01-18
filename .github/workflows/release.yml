@@ -85,9 +85,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: amd64
+          - os: linux
+            arch: amd64
             runner: ubuntu-24.04
-          - arch: arm64
+          - os: linux
+            arch: arm64
             runner: ubuntu-24.04-arm
 
     steps:
@@ -103,27 +105,18 @@ jobs:
         run: |
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go test -v
 
-      - name: Build binary for ${{ matrix.os }}/${{ matrix.arch }}
+      - name: Build packages for ${{ matrix.os }}/${{ matrix.arch }}
         run: |
           [ -d build/${{ matrix.os }}/${{ matrix.arch }} ] || mkdir -p build/${{ matrix.os }}/${{ matrix.arch }}
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.os }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}
 
       - name: Build DEB packages
-        uses: rossigee/gha-build-dpkg@v1
-        id: build
-        with:
-          args: --unsigned-source --unsigned-changes
-
-      # - name: Build DEB packages
-      #   uses: jiro4989/build-deb-action@v4
-      #   with:
-      #     package: ${{ env.APP_NAME }}
-      #     package_root: .debian/fetch-k8s-cert
-      #     maintainer: ${{ env.MAINTAINER }}
-      #     version: ${{ github.ref }}
-      #     arch: '${{ matrix.arch }}'
-      #     desc: '${{ env.DESC }}'
-      #     homepage: 'https://github.com/rossigee/fetch-k8s-cert'
+        run: |
+          dpkg-buildpackage && (
+            mkdir -p artifacts
+            mv ../*.deb ../*.changes ../*.dsc ../*.tar.gz ./artifacts
+            ls -l ./artifacts
+          )
 
       # - name: Build RPM packages
       #   uses: jiro4989/build-rpm-action@v2

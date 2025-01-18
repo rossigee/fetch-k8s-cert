@@ -10,16 +10,17 @@ on:
 
 jobs:
   build:
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        # go_version:
-        #   - 1.23
+        os:
+          - linux
+          - windows
+          - macos
         arch:
           - amd64
           - arm64
-          - windows
-
-    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout source
@@ -31,11 +32,11 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Run tests
-        if: matrix.arch == 'amd64' # Until we can test on other archs
+        #if: matrix.arch == 'amd64' # Until we can test on other archs
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go test -v
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.arch }} go test -v
 
       - name: Build binary for ${{ matrix.goos }}/${{ matrix.arch }}
         run: |
           [ -d build/${{ matrix.goos }}/${{ matrix.arch }} ] || mkdir build/${{ matrix.goos }}/${{ matrix.arch }}
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.goos }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=${{ github.run_number }}" -o build/${{ matrix.goos }}/${{ matrix.arch }}/fetch-k8s-cert${{ matrix.ext }}

@@ -21,8 +21,8 @@ jobs:
       matrix:
         os:
           - linux
-          - windows
-          - macos
+        #  - windows
+        #  - macos
         arch:
           - amd64
           - arm64

@@ -134,6 +134,8 @@ jobs:
 
     permissions:
       contents: write
+      actions: write
+      attestations: write
 
     needs:
       - build
@@ -176,6 +178,11 @@ jobs:
   upload-release:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+      actions: write
+      attestations: write
+
     needs: create-release
 
     strategy:
@@ -201,7 +208,7 @@ jobs:
           name: create-release
 
       - name: Determine upload URL variable
-        id: vars
+        id: bin-vars
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
 
@@ -216,64 +223,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.vars.outputs.upload_url }}
+          upload_url: ${{ steps.bin-vars.outputs.upload_url }}
           asset_path: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           asset_name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           asset_content_type: ${{ matrix.asset_content_type }}
-
-  upload-linux-packages:
-    runs-on: ${{ matrix.runner }}
-
-    needs: create-release
-
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-            runner: ubuntu-24.04
-          - os: linux
-            arch: arm64
-            runner: ubuntu-24.04-arm
-          # - os: macosx
-          #   arch: arm64
-          #   runner: macos-latest
-          # - os: windows
-          #   arch: x64
-          #   runner: windows-latest
-
-    steps:
-      - name: Download release info
-        uses: actions/download-artifact@v4
-        with:
-          name: create-release
-
-      - name: Download binary distribution artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: artifact-binary-${{ matrix.os }}-${{ matrix.arch }}
-
-      - name: Determine binary distribution asset name and path
-        id: bin-vars
-        run: |
-          echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
-          if [[ "${{ runner.os }}" == Windows ]]; then
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip" >> $GITHUB_OUTPUT
-            echo "asset_content_type=application/zip" >> $GITHUB_OUTPUT
-          else
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.tar.gz" >> $GITHUB_OUTPUT
-            echo "asset_content_type=application/gzip" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Upload binary assets
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.bin-vars.outputs.upload_url }}
-          asset_path: ${{ steps.bin-vars.outputs.asset_name }}
-          asset_name: ${{ steps.bin-vars.outputs.asset_name }}
-          asset_content_type: ${{ steps.bin-vars.outputs.asset_content_type }}
 
       - name: Download debian distribution artifact
         uses: actions/download-artifact@v4
@@ -296,57 +249,3 @@ jobs:
           asset_path: ${{ steps.deb-vars.outputs.asset_name }}
           asset_name: ${{ steps.deb-vars.outputs.asset_name }}
           asset_content_type: ${{ steps.deb-vars.outputs.asset_content_type }}
-
-  upload-debian-packages:
-    runs-on: ${{ matrix.runner }}
-
-    needs: create-release
-
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-            runner: ubuntu-24.04
-          - os: linux
-            arch: arm64
-            runner: ubuntu-24.04-arm
-          # - os: macosx
-          #   arch: arm64
-          #   runner: macos-latest
-          # - os: windows
-          #   arch: x64
-          #   runner: windows-latest
-
-    steps:
-      - name: Download ${{ matrix.pkg }} artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: artifact-${{ matrix.os }}-${{ matrix.arch }}
-
-      - name: Download release info
-        uses: actions/download-artifact@v4
-        with:
-          name: create-release
-
-      - id: vars
-        run: |
-          echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
-          if [[ "${{ runner.os }}" == Windows ]]; then
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip" >> $GITHUB_OUTPUT
-            echo "asset_content_type=application/zip" >> $GITHUB_OUTPUT
-          else
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.tar.gz" >> $GITHUB_OUTPUT
-            echo "asset_content_type=application/gzip" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.vars.outputs.upload_url }}
-          asset_path: ${{ steps.vars.outputs.asset_name }}
-          asset_name: ${{ steps.vars.outputs.asset_name }}
-          asset_content_type: ${{ steps.vars.outputs.asset_content_type }}

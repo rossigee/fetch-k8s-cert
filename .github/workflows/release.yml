@@ -142,7 +142,8 @@ jobs:
       - name: Generate changelog
         run: |
           go get -u github.com/git-chglog/git-chglog/cmd/git-chglog
-          git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
+          go env
+          /home/runner/go/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
       - name: Create Release
         id: create-release

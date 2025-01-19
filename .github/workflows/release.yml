@@ -139,6 +139,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
       - name: Generate changelog
         run: |
           (cd /tmp; go install -v github.com/git-chglog/git-chglog@latest)

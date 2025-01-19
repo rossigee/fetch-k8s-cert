@@ -98,7 +98,7 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-deb
+          name: artifact-deb-${{ matrix.os }}-${{ matrix.arch }}
           path: artifacts/*.deb
 
       # [TODO] Build and upload RPM packages

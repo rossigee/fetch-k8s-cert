@@ -132,6 +132,9 @@ jobs:
   create-release:
     runs-on: ubuntu-24.04-arm # Quicker!
 
+    permissions:
+      contents: write
+
     needs:
       - build
 

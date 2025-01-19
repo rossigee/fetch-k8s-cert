@@ -4,7 +4,7 @@ VERSION := 1.3.1
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 
 .PHONY: build
-build: clean build-linux-amd64 # (for now)
+build: clean
 	@[ -d build ] || mkdir -vp build
 	go build $(LDFLAGS) -o build/$(BINARY_NAME)
 

@@ -158,8 +158,8 @@ jobs:
         id: create-release
         uses: softprops/action-gh-release@v2
         with:
-          name: '${{ env.APP_VERSION }}'
-          tag_name: '${{ env.APP_VERSION }}'
+          name: '${{ env.APP_NAME }}-v${{ env.APP_VERSION }}'
+          tag_name: 'v${{ env.APP_VERSION }}'
           body_path: ./changelog
           generate_release_notes: true
           append_body: true

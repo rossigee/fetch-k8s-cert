@@ -7,7 +7,7 @@ Standards-Version: 3.9.8
 Homepage: https://github.com/rossigee/fetch-k8s-cert
 
 Package: fetch-k8s-cert
-Architecture: amd64
+Architecture: amd64 arm64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Small tool to mirror a K8S Certificate resource to a local PEM file
 Pre-Depends: adduser

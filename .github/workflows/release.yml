@@ -147,8 +147,8 @@ jobs:
       - name: Generate changelog
         run: |
           (cd /tmp; go install -v github.com/git-chglog/git-chglog/cmd/git-chglog@latest)
-          find /home/runner -name git-chglog -ls
-          $GOPATH/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
+          env
+          git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
       - name: Create Release
         id: create-release

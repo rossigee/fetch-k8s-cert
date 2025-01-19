@@ -141,13 +141,7 @@ jobs:
 
       - name: Generate changelog
         run: |
-          (
-            cd /tmp
-            git clone https://github.com/git-chglog/git-chglog
-            cd git-chglog
-            go install
-          )
-
+          go get -u github.com/git-chglog/git-chglog/cmd/git-chglog
           git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
       - name: Create Release

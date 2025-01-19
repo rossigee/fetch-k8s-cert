@@ -148,7 +148,7 @@ jobs:
             go install
           )
 
-          ~/go/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
+          git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
       - name: Create Release
         id: create-release

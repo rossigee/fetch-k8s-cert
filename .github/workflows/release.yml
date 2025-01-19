@@ -143,7 +143,8 @@ jobs:
         run: |
           go get -u github.com/git-chglog/git-chglog/cmd/git-chglog
           go env
-          /home/runner/go/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
+          find / -name fetch-k8s-cert -ls
+          $HOME/go/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
       - name: Create Release
         id: create-release

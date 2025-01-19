@@ -130,7 +130,7 @@ jobs:
       # [TODO] Build and upload Windows and MacOS packages
 
   create-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm # Quicker!
 
     needs:
       - build
@@ -141,10 +141,9 @@ jobs:
 
       - name: Generate changelog
         run: |
-          go get -u github.com/git-chglog/git-chglog/cmd/git-chglog
-          go env
+          go install -v github.com/git-chglog/git-chglog@latest
           find /home/runner -name git-chglog -ls
-          $HOME/go/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
+          $GOPATH/bin/git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
       - name: Create Release
         id: create-release

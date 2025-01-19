@@ -251,7 +251,7 @@ jobs:
           name: artifact-binary-${{ matrix.os }}-${{ matrix.arch }}
 
       - name: Determine binary distribution asset name and path
-        id: vars
+        id: bin-vars
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
           if [[ "${{ runner.os }}" == Windows ]]; then
@@ -267,10 +267,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.vars.outputs.upload_url }}
-          asset_path: ${{ steps.vars.outputs.asset_name }}
-          asset_name: ${{ steps.vars.outputs.asset_name }}
-          asset_content_type: ${{ steps.vars.outputs.asset_content_type }}
+          upload_url: ${{ steps.bin-vars.outputs.upload_url }}
+          asset_path: ${{ steps.bin-vars.outputs.asset_name }}
+          asset_name: ${{ steps.bin-vars.outputs.asset_name }}
+          asset_content_type: ${{ steps.bin-vars.outputs.asset_content_type }}
 
       - name: Download debian distribution artifact
         uses: actions/download-artifact@v4
@@ -278,7 +278,7 @@ jobs:
           name: artifact-deb-${{ matrix.os }}-${{ matrix.arch }}
 
       - name: Determine debian distribution asset name and path
-        id: vars
+        id: deb-vars
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
           echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.deb" >> $GITHUB_OUTPUT
@@ -289,10 +289,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.vars.outputs.upload_url }}
-          asset_path: ${{ steps.vars.outputs.asset_name }}
-          asset_name: ${{ steps.vars.outputs.asset_name }}
-          asset_content_type: ${{ steps.vars.outputs.asset_content_type }}
+          upload_url: ${{ steps.deb-vars.outputs.upload_url }}
+          asset_path: ${{ steps.deb-vars.outputs.asset_name }}
+          asset_name: ${{ steps.deb-vars.outputs.asset_name }}
+          asset_content_type: ${{ steps.deb-vars.outputs.asset_content_type }}
 
   upload-debian-packages:
     runs-on: ${{ matrix.runner }}

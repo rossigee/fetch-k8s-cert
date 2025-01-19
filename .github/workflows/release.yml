@@ -58,30 +58,30 @@ jobs:
       #   run: |
       #     version_line=$(head -n 1 "debian/changelog")
       #     if [[ "$version_line" =~ ([0-9]+\.[0-9]+\-[0-9]+) ]]; then
-      #       echo "::set-output name=version::${BASH_REMATCH[1]}"
+      #       echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
       #     else
-      #       echo "::set-output name=version::0.0-1"
+      #       echo "version=0.0-1" >> $GITHUB_OUTPUT
       #     fi
 
-      - name: Create distribution files
+      - name: Create binary distribution
         run: |
           [ -d dist ] || mkdir dist
           cp -r build/* dist
           (
             cd dist
             if [[ "${{ runner.os }}" == Windows ]]; then
-              7z a "${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip" *
+              7z a "${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip" *
             else
-              tar czf "${{ env.APP_NAME }}-${{ env.APP_VERSION }}.tar.gz" *
+              tar czf "${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" *
             fi
             ls -lah *.*
           )
         shell: bash
 
-      - name: Upload artifacts
+      - name: Upload binary distribution
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-${{ matrix.os }}-${{ matrix.arch }}
+          name: artifact-binary-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             dist/*.tar.gz
             dist/*.zip
@@ -123,7 +123,7 @@ jobs:
       # - name: Upload RPM artifact
       #   uses: actions/upload-artifact@v4
       #   with:
-      #     name: artifact-rpm
+      #     name: artifact-rpm-${{ matrix.os }}-${{ matrix.arch }}
       #     path: artifacts/*.rpm
       #     #path: rpmbuild/RPMS/${{ env.ARCH }}/*.rpm
 
@@ -149,7 +149,7 @@ jobs:
           (cd /tmp; go install -v github.com/git-chglog/git-chglog/cmd/git-chglog@latest)
           git-chglog --output ./changelog $(git describe --tags $(git rev-list --tags --max-count=1))
 
-      - name: Create Release
+      - name: Create release
         id: create-release
         uses: actions/create-release@v1
         env:
@@ -161,10 +161,10 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Write upload_url to file
+      - name: Save artifact upload URL
         run: echo '${{ steps.create-release.outputs.upload_url }}' > upload_url.txt
 
-      - name: Upload artifact
+      - name: Record artifact upload URL
         uses: actions/upload-artifact@v4
         with:
           name: create-release
@@ -192,33 +192,109 @@ jobs:
           #   runner: windows-latest
 
     steps:
-      - name: Download artifact for ${{ matrix.os }}/${{ matrix.arch }}
-        uses: actions/download-artifact@v4
-        with:
-          name: artifact-${{ matrix.os }}-${{ matrix.arch }}
-
-      - name: Download release information
+      - name: Retrieve release information
         uses: actions/download-artifact@v4
         with:
           name: create-release
 
-      - name: Set upload URL variable
+      - name: Determine upload URL variable
         id: vars
         run: |
-          echo "::set-output name=upload_url::$(cat upload_url.txt)"
+          echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
 
-      - name: Upload Release Asset
-        id: upload-release-asset
+      - name: Retrieve binary artifact
+        id: download-binary
+        uses: actions/download-artifact@v4
+        with:
+          name: artifact-binary-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Upload binary artifact to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.vars.outputs.upload_url }}
-          asset_path: ${{ env.APP_NAME }}_${{ matrix.asset_name_suffix }}
-          asset_name: ${{ env.APP_NAME }}_${{ matrix.asset_name_suffix }}
+          asset_path: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          asset_name: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           asset_content_type: ${{ matrix.asset_content_type }}
 
   upload-linux-packages:
+    runs-on: ${{ matrix.runner }}
+
+    needs: create-release
+
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            runner: ubuntu-24.04
+          - os: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+          # - os: macosx
+          #   arch: arm64
+          #   runner: macos-latest
+          # - os: windows
+          #   arch: x64
+          #   runner: windows-latest
+
+    steps:
+      - name: Download release info
+        uses: actions/download-artifact@v4
+        with:
+          name: create-release
+
+      - name: Download binary distribution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifact-binary-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Determine binary distribution asset name and path
+        id: vars
+        run: |
+          echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
+          if [[ "${{ runner.os }}" == Windows ]]; then
+            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip" >> $GITHUB_OUTPUT
+            echo "asset_content_type=application/zip" >> $GITHUB_OUTPUT
+          else
+            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.tar.gz" >> $GITHUB_OUTPUT
+            echo "asset_content_type=application/gzip" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload binary assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.vars.outputs.upload_url }}
+          asset_path: ${{ steps.vars.outputs.asset_name }}
+          asset_name: ${{ steps.vars.outputs.asset_name }}
+          asset_content_type: ${{ steps.vars.outputs.asset_content_type }}
+
+      - name: Download debian distribution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifact-deb-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Determine debian distribution asset name and path
+        id: vars
+        run: |
+          echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
+          echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.deb" >> $GITHUB_OUTPUT
+          echo "asset_content_type=application/vnd.debian.binary-package" >> $GITHUB_OUTPUT
+
+      - name: Upload binary assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.vars.outputs.upload_url }}
+          asset_path: ${{ steps.vars.outputs.asset_name }}
+          asset_name: ${{ steps.vars.outputs.asset_name }}
+          asset_content_type: ${{ steps.vars.outputs.asset_content_type }}
+
+  upload-debian-packages:
     runs-on: ${{ matrix.runner }}
 
     needs: create-release
@@ -252,8 +328,14 @@ jobs:
 
       - id: vars
         run: |
-          echo "::set-output name=upload_url::$(cat upload_url.txt)"
-          echo "::set-output name=asset_name::$(ls *.${{ matrix.pkg }} | head -n 1)"
+          echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
+          if [[ "${{ runner.os }}" == Windows ]]; then
+            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip" >> $GITHUB_OUTPUT
+            echo "asset_content_type=application/zip" >> $GITHUB_OUTPUT
+          else
+            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.tar.gz" >> $GITHUB_OUTPUT
+            echo "asset_content_type=application/gzip" >> $GITHUB_OUTPUT
+          fi
 
       - name: Upload Release Asset
         id: upload-release-asset
@@ -264,4 +346,4 @@ jobs:
           upload_url: ${{ steps.vars.outputs.upload_url }}
           asset_path: ${{ steps.vars.outputs.asset_name }}
           asset_name: ${{ steps.vars.outputs.asset_name }}
-          asset_content_type: ${{ matrix.asset_content_type }}
+          asset_content_type: ${{ steps.vars.outputs.asset_content_type }}

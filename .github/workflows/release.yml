@@ -158,11 +158,11 @@ jobs:
         id: create-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
+          name: '${{ env.APP_VERSION }}'
+          tag_name: '${{ env.APP_VERSION }}'
           body_path: ./changelog
-          draft: false
-          prerelease: false
+          generate_release_notes: true
+          append_body: true
 
       - name: Save artifact upload URL
         run: echo '${{ steps.create-release.outputs.upload_url }}' > upload_url.txt
@@ -210,10 +210,10 @@ jobs:
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
           if [[ "${{ runner.os }}" == Windows ]]; then
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.zip" >> $GITHUB_OUTPUT
+            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip" >> $GITHUB_OUTPUT
             echo "asset_content_type=application/zip" >> $GITHUB_OUTPUT
           else
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.tar.gz" >> $GITHUB_OUTPUT
+            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> $GITHUB_OUTPUT
             echo "asset_content_type=application/gzip" >> $GITHUB_OUTPUT
           fi
 
@@ -225,13 +225,15 @@ jobs:
 
       - name: Upload binary artifact to release
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: '${{ github.token }}'
         with:
           upload_url: ${{ steps.bin-vars.outputs.upload_url }}
           asset_path: ${{ steps.bin-vars.outputs.asset_name }}
           asset_name: ${{ steps.bin-vars.outputs.asset_name }}
           asset_content_type: ${{ steps.bin-vars.outputs.asset_content_type }}
 
-      - name: Download debian distribution artifact
+      - name: Retrieve debian distribution artifact
         uses: actions/download-artifact@v4
         with:
           name: artifact-deb-${{ matrix.os }}-${{ matrix.arch }}
@@ -240,11 +242,13 @@ jobs:
         id: deb-vars
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
-          echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}.deb" >> $GITHUB_OUTPUT
+          echo "asset_name=${{ env.APP_NAME }}_${{ env.APP_VERSION }}-1_${{ matrix.arch }}.deb" >> $GITHUB_OUTPUT
           echo "asset_content_type=application/vnd.debian.binary-package" >> $GITHUB_OUTPUT
 
-      - name: Upload binary assets
+      - name: Upload binary assets to release
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: '${{ github.token }}'
         with:
           upload_url: ${{ steps.deb-vars.outputs.upload_url }}
           asset_path: ${{ steps.deb-vars.outputs.asset_name }}

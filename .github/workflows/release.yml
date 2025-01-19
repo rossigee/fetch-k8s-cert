@@ -103,14 +103,13 @@ jobs:
 
       - name: Build RPM packages
         run: |
-          sudo apt-get install -y build-essential rpm
           mkdir -p ~/rpmbuild/SPECS ~/rpmbuild/SOURCES
           appid=${{ env.APP_NAME }}-${{ env.APP_VERSION }}
           cp -r ../fetch-k8s-cert /tmp/${appid} && (
             cd /tmp
             tar cf - ${appid} | bzip2 > ~/rpmbuild/SOURCES/${appid}.tar.bz2
           )
-          sed 's/(^Version:[[:space:]]*).*/\1${{github.ref_name}}/' \
+          sed -e 's/(^Version:[[:space:]]*).*/\1${{github.ref_name}}/' \
             < rpmbuild/SPECS/${{ env.APP_NAME }}.spec \
             > ~/rpmbuild/SPECS/${appid}.spec
           rpmbuild -bb ~/rpmbuild/SPECS/${appid}.spec && (

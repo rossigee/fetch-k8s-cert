@@ -6,7 +6,7 @@ LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 .PHONY: build
 build: clean
 	@[ -d build ] || mkdir -vp build
-	go build $(LDFLAGS) -o build/$(BINARY_NAME)
+	go build -v $(LDFLAGS) -o build/$(BINARY_NAME)
 
 .PHONY: deb
 deb:

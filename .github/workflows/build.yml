@@ -47,5 +47,5 @@ jobs:
         run: |
           [ -d build ] || mkdir -p build
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go \
-            build -ldflags "-X main.version=${{ github.run_number }}" \
+            build -v -ldflags "-X main.version=${{ github.run_number }}" \
             -o build/fetch-k8s-cert${{ matrix.ext }}

@@ -1,18 +1,91 @@
 # Fetch K8s Certificate 
 
-This program is designed to be run on a regulary schedule to poll a K8S cluster for changes to a given TLS certificate resource. Briefly, this tool reads a YAML configuration file, connects to a Kubernetes API using credentials configured, fetches the contents of a TLS Certificate resource, compares it to a local file, and triggers a reload command if the contents have changed.
+Summary: A utility to pull a TLS certificate from a Kubernetes secret and write it to disk for consumption by other services.
 
-The primary use case for this tool is to allow `cert-manager` to manage the lifecycle of the certificates on a Kubernetes cluster, but a non-K8S instance can use this tool to retrieve the latest copy of the TLS keypair from cluster and manage it locally. A local process (for example, 'haproxy') can then use the TLS certificate for client or server authentication.
+This program is designed to connect to a Kubernetes API, fetch the contents of a TLS Certificate resource and compare it to the existing local copy. If the certificate has been updated on the cluster, the local copy will be replaced and a reload command will be triggered, which may be used to restart any dependent services.
 
-## Basic usage
+The primary use case for this is for organisations already running K8S clusters to be able to leverage their existing `cert-manager` deployment to manage certificates for services running outside of the cluster too. This may be a better solution for many organisations that would prefer not to deploy more complicated tools (i.e. `certbot`) at towards the edge.
 
-Build the binary...
+## Kubernetes configuration
 
+Assuming you're using `cert-manager` and have already configured your `Issuer`/`ClusterIssuer` resources. To produce the TLS Secret resources, you would likely just need to create a `Certificate` resource (i.e. in Flux/ArgoCD), and a `ServiceAccount` that can read the resulting TLS `Secret`. For example:
+
+```yaml
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: myservice
+spec:
+  commonName: service.yourdomain.com
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: vault
+  privateKey:
+    algorithm: ECDSA
+    rotationPolicy: Always
+    size: 384
+  secretName: service-tls
+  usages:
+  - key agreement
+  - digital signature
+  - server auth
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myservice
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: myservice-sa
+  annotations:
+    kubernetes.io/service-account.name: myservice
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: myservice
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: myservice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: myservice
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:serviceaccount:yournamespace:myservice
 ```
-go build
+
+At this point, the `Secret` should be available and ready for the service to check and collect on a regular basis.
+
+You will need the JWT service account token for the next bit, which you can obtain using `kubectl` as follows:
+
+```bash
+kubectl -n yournamespace get secret myservice-sa -ojsonpath='{.data.token}' | base64 -d >/tmp/jwt-token
 ```
 
-Create a configuration file in YAML format with the following fields:
+Confirm the JWT service account token has access to retrieve the TLS secret:
+
+```bash
+kubectl --token=$(cat /tmp/jwt-token) -n yournamespace get secret myservice-sa -ojsonpath='{.data.token}' | base64 -d;echo
+```
+
+Next, create a configuration file in YAML format with the following fields:
 
 ```yaml
 # URL of the Kubernetes API
@@ -28,22 +101,120 @@ skipTLSVerification: true
 token: jwt_token_from_service_account
 
 # Kubernetes namespace where the certificate is located
-namespace: internal
+namespace: yournamespace
 
 # Name of the secret resource containing the certificate details
-secretName: internal-tls
+secretName: service-tls
 
 # Path to the local TLS files.
-localCAFile: /etc/pki/tls/internal-ca.pem
-localCertFile: /etc/pki/tls/internal-cert.pem
-localKeyFile: /etc/pki/tls/internal-key.pem
+localCAFile: /etc/pki/tls/service-ca.pem
+localCertFile: /etc/pki/tls/service-cert.pem
+localKeyFile: /etc/pki/tls/service-key.pem
 
 # Command to trigger a service reload.
+# NOTE: If the service using the certificate knows when the certificate files have been updated and can reload them itself, the `reloadCommand` is largely unnecessary. However, if the service needs to be restarted manually when a new certificate is deployed, the `reloadCommand` could be used to `systemctl restart yourservice`. The `fetch-k8s-cert` tool has been designed to be run as 'non-root', so you may also need to add `sudo` and configure `sudoers` if restarting the service requires elevated privileges, or take other measures if running in a Docker container.
 reloadCommand: "echo 'The cert changed.'"
 ```
 
-Run the binary...
+You could run try running this locally...
 
-```
+```bash
 ./fetch-k8s-cert -f config.yaml
 ```
+
+Typically, you would be deploying this either as a 'systemd' service or as a Docker container in `docker-compose`.
+
+### Debian Package Installation on Ubuntu
+
+1. **Install the Package**
+   ```bash
+   sudo apt update
+   sudo apt install ./fetch-k8s-cert_1.0.0_amd64.deb
+   ```
+
+2. **Configure the Tool**
+   - Put your configuration file in place at `/etc/fetch-k8s-cert/config.yaml`.
+   - Set appropriate permissions:
+     ```bash
+     sudo chown root:root /etc/fetch-k8s-cert/config.yaml
+     sudo chmod 600 /etc/fetch-k8s-cert/config.yaml
+     ```
+
+3. **Run the Service**
+   - Enable and start the systemd service:
+     ```bash
+     sudo systemctl enable fetch-k8s-cert
+     sudo systemctl start fetch-k8s-cert
+     ```
+   - Verify the service is running:
+     ```bash
+     sudo systemctl status fetch-k8s-cert
+     ```
+
+### Docker Compose Setup with Nginx
+
+This setup demonstrates using `fetch-k8s-cert` to renew certificates for an Nginx container.
+
+1. **Create a Docker Compose File**
+   Create `docker-compose.yml`:
+   ```yaml
+   services:
+     cert-fetcher:
+       image: fetch-k8s-cert:latest
+       volumes:
+         - ./certs:/etc/ssl/certs
+         - ./config:/etc/fetch-k8s-cert
+       environment:
+         - CONFIG_PATH=/etc/fetch-k8s-cert/config.yaml
+       restart: no
+
+     nginx:
+       image: nginx:latest
+       volumes:
+         - ./certs:/etc/nginx/certs:ro
+       ports:
+         - "443:443"
+       depends_on:
+         - cert-fetcher
+       restart: always
+   ```
+
+4. **Nginx/HAProxy Configuration**
+   - For Nginx, update `/etc/nginx/nginx.conf` to use the certificates:
+     ```nginx
+     server {
+         listen 443 ssl;
+         ssl_certificate /etc/nginx/certs/tls.crt;
+         ssl_certificate_key /etc/nginx/certs/tls.key;
+         ...
+     }
+     ```
+   - For HAProxy, update `/etc/haproxy/haproxy.cfg`:
+     ```haproxy
+     frontend https_front
+         bind *:443 ssl crt /etc/nginx/certs/tls.pem
+         ...
+     ```
+   - Combine certificate and key for HAProxy:
+     ```bash
+     cat /etc/ssl/certs/tls.crt /etc/ssl/certs/tls.key > /etc/ssl/certs/tls.pem
+     ```
+
+3. **Run Docker Compose**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Restart Services**
+   - Restart container when certificates are updated:
+     ```bash
+     docker-compose restart nginx
+     ```
+
+## Notes
+- Ensure the Kubernetes secret contains `tls.crt` and `tls.key` fields (obviously).
+- The `cert-fetcher` container should have access to the Kubernetes API (obviously).
+- Monitor logs for issues:
+  ```bash
+  docker-compose logs cert-fetcher
+  ```

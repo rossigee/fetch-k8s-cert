@@ -1,4 +1,4 @@
-fetch-k8s-cert (1.3.2-1) unstable; urgency=medium
+fetch-k8s-cert (1.3.4-1) unstable; urgency=medium
 
   * Build system updates.
 

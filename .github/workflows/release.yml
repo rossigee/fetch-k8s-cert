@@ -8,7 +8,7 @@ on:
 
 env:
   APP_NAME: 'fetch-k8s-cert'
-  APP_VERSION: '1.3.2'
+  APP_VERSION: '1.3.4'
   MAINTAINER: 'rossigee'
   DESC: 'fetch-k8s-cert retrieves a X509 TLS secret from a K8S cluster API endpoint.'
 

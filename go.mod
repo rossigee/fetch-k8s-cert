@@ -1,6 +1,6 @@
 module github.com/rossigee/fetch-k8s-cert
 
-go 1.23.5
+go 1.24
 
 require (
 	github.com/go-yaml/yaml v2.1.0+incompatible

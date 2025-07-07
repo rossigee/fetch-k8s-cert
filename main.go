@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
@@ -19,16 +20,17 @@ import (
 var log = logrus.New()
 
 type Config struct {
-	K8SAPIURL           string `yaml:"k8sAPIURL"`
-	K8SCACertFile       string `yaml:"k8sCACertFile"`
-	SkipTLSVerification bool   `yaml:"skipTLSVerification"`
-	Token               string `yaml:"token"`
-	Namespace           string `yaml:"namespace"`
-	SecretName          string `yaml:"secretName"`
-	LocalCAFile         string `yaml:"localCAFile"`
-	LocalCertFile       string `yaml:"localCertFile"`
-	LocalKeyFile        string `yaml:"localKeyFile"`
-	ReloadCommand       string `yaml:"reloadCommand"`
+	K8SAPIURL               string `yaml:"k8sAPIURL"`
+	K8SCACertFile           string `yaml:"k8sCACertFile"`
+	SkipTLSVerification     bool   `yaml:"skipTLSVerification"`
+	Token                   string `yaml:"token"`
+	Namespace               string `yaml:"namespace"`
+	SecretName              string `yaml:"secretName"`
+	LocalCAFile             string `yaml:"localCAFile"`
+	LocalCertFile           string `yaml:"localCertFile"`
+	LocalKeyFile            string `yaml:"localKeyFile"`
+	ReloadCommand           string `yaml:"reloadCommand"`
+	UseIntermediateCA       bool   `yaml:"useIntermediateCA"`
 }
 
 type TLSBundle struct {
@@ -95,7 +97,7 @@ func getTLSCertData(config Config) (*TLSBundle, error) {
 		return nil, err
 	}
 
-	tlsBundle, err := extractTLSBundleFromSecret(secretData)
+	tlsBundle, err := extractTLSBundleFromSecret(secretData, config)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +105,70 @@ func getTLSCertData(config Config) (*TLSBundle, error) {
 	return tlsBundle, nil
 }
 
-func extractTLSBundleFromSecret(secretData []byte) (*TLSBundle, error) {
+// extractIntermediateCAFromCertChain extracts the intermediate CA certificate
+// that directly issued the server certificate from a certificate chain.
+// It parses the certificate chain and finds the certificate that signed the
+// server certificate (first certificate in the chain).
+func extractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
+	certificates, err := parseCertificateChain(certChainPEM)
+	if err != nil {
+		return nil, err
+	}
+	
+	if len(certificates) < 2 {
+		return nil, fmt.Errorf("certificate chain must contain at least 2 certificates (server + issuer), found %d", len(certificates))
+	}
+	
+	// The server certificate is typically the first one
+	serverCert := certificates[0]
+	log.Infof("Server certificate subject: %s", serverCert.Subject.CommonName)
+	
+	// Find the certificate that issued the server certificate
+	for i, cert := range certificates[1:] {
+		if err := serverCert.CheckSignatureFrom(cert); err == nil {
+			// This is the direct issuer (intermediate CA)
+			log.Infof("Found intermediate CA at position %d: %s", i+1, cert.Subject.CommonName)
+			return certificateToPEM(cert)
+		}
+	}
+	
+	return nil, fmt.Errorf("could not find intermediate CA that issued the server certificate")
+}
+
+// parseCertificateChain parses a PEM-encoded certificate chain and returns
+// all certificates as x509.Certificate objects
+func parseCertificateChain(certChainPEM []byte) ([]*x509.Certificate, error) {
+	var certificates []*x509.Certificate
+	
+	rest := certChainPEM
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		if block.Type == "CERTIFICATE" {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing certificate: %v", err)
+			}
+			certificates = append(certificates, cert)
+		}
+	}
+	
+	return certificates, nil
+}
+
+// certificateToPEM converts an x509.Certificate to PEM format
+func certificateToPEM(cert *x509.Certificate) ([]byte, error) {
+	pemBlock := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}
+	return pem.EncodeToMemory(pemBlock), nil
+}
+
+func extractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, error) {
 	var secret struct {
 		Data map[string]string `json:"data"`
 	}
@@ -120,10 +185,6 @@ func extractTLSBundleFromSecret(secretData []byte) (*TLSBundle, error) {
 		return nil, fmt.Errorf("TLS certificate or key not found in secret data")
 	}
 
-	decodedCA, err := base64.StdEncoding.DecodeString(caData)
-	if err != nil {
-		return nil, err
-	}
 	decodedCert, err := base64.StdEncoding.DecodeString(certData)
 	if err != nil {
 		return nil, err
@@ -133,8 +194,32 @@ func extractTLSBundleFromSecret(secretData []byte) (*TLSBundle, error) {
 		return nil, err
 	}
 
+	var finalCAData []byte
+	
+	// If useIntermediateCA is enabled, extract the intermediate CA from the certificate chain
+	if config.UseIntermediateCA {
+		log.Info("Extracting intermediate CA from certificate chain")
+		intermediateCA, err := extractIntermediateCAFromCertChain(decodedCert)
+		if err != nil {
+			log.Warnf("Failed to extract intermediate CA, falling back to ca.crt: %v", err)
+			// Fall back to the original ca.crt
+			finalCAData, err = base64.StdEncoding.DecodeString(caData)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			finalCAData = intermediateCA
+		}
+	} else {
+		// Use the standard ca.crt field
+		finalCAData, err = base64.StdEncoding.DecodeString(caData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	tlsBundle := TLSBundle{
-		decodedCA,
+		finalCAData,
 		decodedCert,
 		decodedKey,
 	}

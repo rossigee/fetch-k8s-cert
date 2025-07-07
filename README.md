@@ -114,6 +114,12 @@ localKeyFile: /etc/pki/tls/service-key.pem
 # Command to trigger a service reload.
 # NOTE: If the service using the certificate knows when the certificate files have been updated and can reload them itself, the `reloadCommand` is largely unnecessary. However, if the service needs to be restarted manually when a new certificate is deployed, the `reloadCommand` could be used to `systemctl restart yourservice`. The `fetch-k8s-cert` tool has been designed to be run as 'non-root', so you may also need to add `sudo` and configure `sudoers` if restarting the service requires elevated privileges, or take other measures if running in a Docker container.
 reloadCommand: "echo 'The cert changed.'"
+
+# Extract intermediate CA from certificate chain instead of using ca.crt
+# This is useful when the service needs the intermediate CA that actually issued 
+# the server certificate, rather than the root CA stored in the secret's ca.crt field.
+# Default: false (uses ca.crt field)
+useIntermediateCA: false
 ```
 
 You could run try running this locally...
@@ -211,9 +217,68 @@ This setup demonstrates using `fetch-k8s-cert` to renew certificates for an Ngin
      docker-compose restart nginx
      ```
 
+## Intermediate CA Extraction
+
+When working with multi-tier PKI setups, you may encounter situations where the CA certificate stored in the Kubernetes secret's `ca.crt` field is the root CA, but your service actually needs the intermediate CA that directly issued the server certificate.
+
+### Problem Scenario
+
+In a typical enterprise PKI setup:
+1. **Root CA** issues certificates to **Intermediate CAs**
+2. **Intermediate CAs** issue certificates to servers/services
+3. Services need the **Intermediate CA** certificate for proper validation
+4. However, cert-manager often stores the **Root CA** in the `ca.crt` field
+
+This causes TLS validation errors like:
+- "certificate relies on legacy Common Name field, use SANs instead"
+- "certificate hasn't got a known issuer"
+
+### Solution: `useIntermediateCA` Option
+
+Enable intermediate CA extraction to automatically find and extract the correct CA certificate:
+
+```yaml
+# Enable intermediate CA extraction
+useIntermediateCA: true
+```
+
+### How It Works
+
+1. **Parses Certificate Chain**: Examines all certificates in the `tls.crt` field
+2. **Finds Direct Issuer**: Uses cryptographic signature verification to identify which certificate issued the server certificate
+3. **Extracts Intermediate CA**: Returns the intermediate CA certificate in PEM format
+4. **Graceful Fallback**: Falls back to `ca.crt` if intermediate extraction fails
+
+### Example Configuration
+
+```yaml
+# libvirt TLS configuration with intermediate CA extraction
+k8sAPIURL: https://k8s-api.cluster.local:6443
+skipTLSVerification: true
+token: eyJhbGciOiJSUzI1NiIs...
+namespace: vm-hosts
+secretName: libvirt-tls
+localCAFile: /etc/pki/CA/cacert.pem
+localCertFile: /etc/pki/libvirt/servercert.pem
+localKeyFile: /etc/pki/libvirt/private/serverkey.pem
+reloadCommand: "systemctl restart libvirtd.service"
+useIntermediateCA: true
+```
+
+### Logging
+
+When intermediate CA extraction is enabled, you'll see detailed logging:
+
+```
+time="2025-07-07T13:55:57+07:00" level=info msg="Extracting intermediate CA from certificate chain"
+time="2025-07-07T13:55:57+07:00" level=info msg="Server certificate subject: server.example.com"
+time="2025-07-07T13:55:57+07:00" level=info msg="Found intermediate CA at position 1: Example Intermediate CA"
+```
+
 ## Notes
 - Ensure the Kubernetes secret contains `tls.crt` and `tls.key` fields (obviously).
 - The `cert-fetcher` container should have access to the Kubernetes API (obviously).
+- When using `useIntermediateCA: true`, ensure your certificate chain contains both server and intermediate certificates.
 - Monitor logs for issues:
   ```bash
   docker-compose logs cert-fetcher

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -46,7 +47,11 @@ func TestMainFunction_Success(t *testing.T) {
 	requestBody := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, encodedCA, encodedCert, encodedKey)
 
 	runTestWithConfig(t, requestBody, func(config Config) {
-		mainWithConfig(config)
+		ctx := context.Background()
+		err := run(ctx, config)
+		if err != nil {
+			t.Fatalf("run() failed: %v", err)
+		}
 
 		caFile, err := os.Open(config.LocalCAFile)
 		if err != nil {
@@ -74,11 +79,15 @@ func TestMainFunction_Failure(t *testing.T) {
 	requestBody := fmt.Sprintf(`{"data": {"ca.cert": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, testCA, testCert, testKey)
 
 	runTestWithConfig(t, requestBody, func(config Config) {
-		mainWithConfig(config)
+		ctx := context.Background()
+		err := run(ctx, config)
+		if err == nil {
+			t.Errorf("Expected run() to fail, but it succeeded")
+		}
 
-		// Check if the expected error message is logged
-		if !containsLogMessage(hook.Messages, "Error retrieving TLS credentials from Kubernetes API: invalid character '\\n' in string literal") {
-			t.Errorf("Expected error message not found in logs")
+		// Check if the expected error message is logged or returned
+		if !containsLogMessage(hook.Messages, "failed to get TLS bundle") && !strings.Contains(err.Error(), "failed to get TLS bundle") {
+			t.Errorf("Expected error message not found in logs or error: %v", err)
 		}
 	})
 }
@@ -96,14 +105,18 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 	requestBody := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, encodedCA, encodedCert, encodedKey)
 
 	runTestWithConfig(t, requestBody, func(config Config) {
-		// Modify the config to use an invalid token
+		// Modify the config to use an invalid path
 		config.LocalCAFile = "/etc/hosts"
 
-		mainWithConfig(config)
+		ctx := context.Background()
+		err := run(ctx, config)
+		if err == nil {
+			t.Errorf("Expected run() to fail, but it succeeded")
+		}
 
-		// Check if the expected error message is logged
-		if !containsLogMessage(hook.Messages, "Unable to update local CA file: open /etc/hosts: permission denied") {
-			t.Errorf("Expected error message not found in logs")
+		// Check if the expected error message is logged or returned
+		if !containsLogMessage(hook.Messages, "failed to update certificate files") && !strings.Contains(err.Error(), "failed to update certificate files") {
+			t.Errorf("Expected error message not found in logs or error: %v", err)
 		}
 	})
 }
@@ -282,7 +295,7 @@ func TestExtractIntermediateCAFromCertChain_Success(t *testing.T) {
 		t.Fatalf("Failed to create test certificate chain: %v", err)
 	}
 	
-	intermediatePEM, err := extractIntermediateCAFromCertChain(certChain)
+	intermediatePEM, err := ExtractIntermediateCAFromCertChain(certChain)
 	if err != nil {
 		t.Fatalf("Failed to extract intermediate CA: %v", err)
 	}
@@ -321,7 +334,7 @@ func TestExtractIntermediateCAFromCertChain_InsufficientCerts(t *testing.T) {
 	
 	singleCertPEM, _ := generateCertificate(rootTemplate, rootTemplate, &rootKey.PublicKey, rootKey)
 	
-	_, err := extractIntermediateCAFromCertChain(singleCertPEM)
+	_, err := ExtractIntermediateCAFromCertChain(singleCertPEM)
 	if err == nil {
 		t.Error("Expected error for insufficient certificates, got nil")
 	}
@@ -335,7 +348,7 @@ func TestExtractIntermediateCAFromCertChain_InsufficientCerts(t *testing.T) {
 func TestExtractIntermediateCAFromCertChain_InvalidPEM(t *testing.T) {
 	invalidPEM := []byte("invalid PEM data")
 	
-	_, err := extractIntermediateCAFromCertChain(invalidPEM)
+	_, err := ExtractIntermediateCAFromCertChain(invalidPEM)
 	if err == nil {
 		t.Error("Expected error for invalid PEM, got nil")
 	}
@@ -357,7 +370,7 @@ func TestExtractTLSBundleWithIntermediateCA(t *testing.T) {
 	
 	// Test with useIntermediateCA enabled
 	config := Config{UseIntermediateCA: true}
-	bundle, err := extractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
@@ -395,7 +408,7 @@ func TestExtractTLSBundleWithoutIntermediateCA(t *testing.T) {
 	
 	// Test with useIntermediateCA disabled (default)
 	config := Config{UseIntermediateCA: false}
-	bundle, err := extractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
@@ -472,5 +485,169 @@ func TestCertificateToPEM(t *testing.T) {
 	
 	if decodedCert.Subject.CommonName != "Test Certificate" {
 		t.Errorf("Expected CN 'Test Certificate', got '%s'", decodedCert.Subject.CommonName)
+	}
+}
+
+// Additional test cases for edge cases and error handling
+
+func TestExtractIntermediateCA_MalformedCertificate(t *testing.T) {
+	// Create a chain with malformed certificate data
+	serverPEM := []byte(`-----BEGIN CERTIFICATE-----
+MALFORMED_CERTIFICATE_DATA
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+ALSO_MALFORMED
+-----END CERTIFICATE-----`)
+
+	_, err := ExtractIntermediateCAFromCertChain(serverPEM)
+	if err == nil {
+		t.Error("Expected error for malformed certificate, got nil")
+	}
+
+	// The function now validates chain length before parsing, so we get a different error
+	expectedErrors := []string{"error parsing certificate", "certificate chain must contain at least"}
+	found := false
+	for _, expectedError := range expectedErrors {
+		if strings.Contains(err.Error(), expectedError) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected error containing one of %v, got '%s'", expectedErrors, err.Error())
+	}
+}
+
+func TestExtractIntermediateCA_SelfSignedCertificate(t *testing.T) {
+	// Create a self-signed certificate (no intermediate)
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{CommonName: "Self-Signed Certificate"},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+		IsCA:        true,
+	}
+	
+	certPEM, _ := generateCertificate(template, template, &key.PublicKey, key)
+	
+	// Add another unrelated certificate
+	otherKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	otherTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject: pkix.Name{CommonName: "Other Certificate"},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+	}
+	otherCertPEM, _ := generateCertificate(otherTemplate, otherTemplate, &otherKey.PublicKey, otherKey)
+	
+	// Combine into chain
+	var chainBuffer bytes.Buffer
+	chainBuffer.Write(certPEM)
+	chainBuffer.Write(otherCertPEM)
+	
+	_, err := ExtractIntermediateCAFromCertChain(chainBuffer.Bytes())
+	if err == nil {
+		t.Error("Expected error for self-signed certificate with no valid issuer, got nil")
+	}
+	
+	expectedError := "could not find intermediate CA"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error containing '%s', got '%s'", expectedError, err.Error())
+	}
+}
+
+func TestExtractTLSBundle_MissingSecretFields(t *testing.T) {
+	// Test with missing tls.crt field
+	secretData := `{"data": {"ca.crt": "Y2EtZGF0YQ==", "tls.key": "a2V5LWRhdGE="}}`
+	
+	config := Config{UseIntermediateCA: false}
+	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	if err == nil {
+		t.Error("Expected error for missing tls.crt field, got nil")
+	}
+	
+	expectedError := "TLS certificate or key not found in secret data"
+	if !strings.Contains(err.Error(), expectedError) {
+		t.Errorf("Expected error containing '%s', got '%s'", expectedError, err.Error())
+	}
+}
+
+func TestExtractTLSBundle_InvalidBase64(t *testing.T) {
+	// Test with invalid base64 data
+	secretData := `{"data": {"ca.crt": "invalid-base64!", "tls.crt": "Y2VydC1kYXRh", "tls.key": "a2V5LWRhdGE="}}`
+	
+	config := Config{UseIntermediateCA: false}
+	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	if err == nil {
+		t.Error("Expected error for invalid base64 data, got nil")
+	}
+}
+
+func TestExtractTLSBundle_InvalidJSON(t *testing.T) {
+	// Test with invalid JSON
+	secretData := `{"data": {malformed json`
+	
+	config := Config{UseIntermediateCA: false}
+	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	if err == nil {
+		t.Error("Expected error for invalid JSON, got nil")
+	}
+}
+
+func TestExtractTLSBundle_IntermediateCAFallback(t *testing.T) {
+	// Test fallback to ca.crt when intermediate extraction fails
+	invalidCertChain := []byte("invalid certificate data")
+	encodedInvalidChain := base64.StdEncoding.EncodeToString(invalidCertChain)
+	
+	mockRootCA := []byte("fallback-root-ca-data")
+	encodedCA := base64.StdEncoding.EncodeToString(mockRootCA)
+	encodedKey := base64.StdEncoding.EncodeToString([]byte("mock-private-key"))
+	
+	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, 
+		encodedCA, encodedInvalidChain, encodedKey)
+	
+	// Test with useIntermediateCA enabled but fallback should occur
+	config := Config{UseIntermediateCA: true}
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	if err != nil {
+		t.Fatalf("Expected successful fallback, got error: %v", err)
+	}
+	
+	// Should have fallen back to ca.crt
+	if !bytes.Equal(bundle.CAData, mockRootCA) {
+		t.Error("Expected fallback to ca.crt data")
+	}
+}
+
+// Benchmark tests for performance analysis
+
+func BenchmarkExtractIntermediateCA(b *testing.B) {
+	certChain, err := createTestCertificateChain()
+	if err != nil {
+		b.Fatalf("Failed to create test certificate chain: %v", err)
+	}
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := ExtractIntermediateCAFromCertChain(certChain)
+		if err != nil {
+			b.Fatalf("Benchmark failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkParseCertificateChain(b *testing.B) {
+	certChain, err := createTestCertificateChain()
+	if err != nil {
+		b.Fatalf("Failed to create test certificate chain: %v", err)
+	}
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := parseCertificateChain(certChain)
+		if err != nil {
+			b.Fatalf("Benchmark failed: %v", err)
+		}
 	}
 }

@@ -38,10 +38,30 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Run tests
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          only-new-issues: true
+
+      - name: Run tests with coverage
         run: |
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
-            go test -v
+            go test -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Run security scan
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: '-fmt sarif -out gosec.sarif ./...'
 
       - name: Build binary
         run: |

@@ -1,0 +1,48 @@
+# Example configuration for fetch-k8s-cert v2.0.0
+
+# Kubernetes API configuration
+k8sAPIURL: https://your.cluster.address:6443
+k8sCACertFile: /etc/pki/tls/ca.crt
+skipTLSVerification: false
+
+# Authentication
+token: eyJhbGciOiJSUzI1NiIs...  # JWT token from service account
+
+# Target secret
+namespace: yournamespace
+secretName: service-tls
+
+# Local file paths
+localCAFile: /etc/pki/tls/service-ca.pem
+localCertFile: /etc/pki/tls/service-cert.pem
+localKeyFile: /etc/pki/tls/service-key.pem
+
+# Service reload command
+reloadCommand: "systemctl restart yourservice"
+
+# Certificate handling
+useIntermediateCA: true
+
+# Observability configuration (optional)
+observability:
+  # Logging
+  logLevel: info                    # debug, info, warn, error
+  logFormat: json                   # text, json
+  logToFile: false                  # enable file logging
+  logFile: /var/log/fetch-k8s-cert.log
+  enableStructured: true           # structured logging fields
+
+  # Metrics (Prometheus)
+  enableMetrics: true               # enable metrics server
+  metricsPort: 8080                 # metrics server port
+  metricsPath: /metrics             # metrics endpoint path
+  metricsAddress: 0.0.0.0           # bind address
+
+  # Tracing (OpenTelemetry)
+  enableTracing: true               # enable distributed tracing
+  tracingEndpoint: http://jaeger:14268/api/traces  # OTLP endpoint
+  tracingHeaders:                   # additional headers
+    Authorization: "Bearer <token>"
+  serviceName: fetch-k8s-cert       # service name for tracing
+  serviceVersion: 2.0.0             # service version
+  tracingSampling: 1.0              # sampling ratio (0.0-1.0)

@@ -8,7 +8,6 @@ on:
 
 env:
   APP_NAME: 'fetch-k8s-cert'
-  APP_VERSION: '1.3.4'
   MAINTAINER: 'rossigee'
   DESC: 'fetch-k8s-cert retrieves a X509 TLS secret from a K8S cluster API endpoint.'
 
@@ -41,16 +40,29 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Run tests
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          only-new-issues: true
+
+      - name: Run tests with coverage
         run: |
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
-            go test -v
+            go test -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Run security scan
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: '-fmt sarif -out gosec.sarif ./...'
 
       - name: Build binary
         run: |
           [ -d build ] || mkdir -p build
+          VERSION=${GITHUB_REF#refs/tags/v}
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go \
-            build -v -ldflags "-X main.version=${{ github.run_number }}" \
+            build -v -ldflags "-X main.version=${VERSION}" \
             -o build/fetch-k8s-cert${{ matrix.ext }}
 
       # - name: Determine packaging version number
@@ -67,12 +79,13 @@ jobs:
         run: |
           [ -d dist ] || mkdir dist
           cp -r build/* dist
+          VERSION=${GITHUB_REF#refs/tags/v}
           (
             cd dist
             if [[ "${{ runner.os }}" == Windows ]]; then
-              7z a "${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip" *
+              7z a "${{ env.APP_NAME }}-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip" *
             else
-              tar czf "${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" *
+              tar czf "${{ env.APP_NAME }}-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" *
             fi
             ls -lah *.*
           )
@@ -154,7 +167,7 @@ jobs:
           context: .
           platforms: linux/arm64,linux/amd64
           push: true
-          tags: rossigee/fetch-k8s-cert:${{ env.APP_VERSION }}
+          tags: rossigee/fetch-k8s-cert:${GITHUB_REF#refs/tags/v}
 
   create-release:
     runs-on: ubuntu-24.04-arm # Quicker!
@@ -185,8 +198,8 @@ jobs:
         id: create-release
         uses: softprops/action-gh-release@v2
         with:
-          name: '${{ env.APP_NAME }}-v${{ env.APP_VERSION }}'
-          tag_name: 'v${{ env.APP_VERSION }}'
+          name: '${{ env.APP_NAME }}-${{ github.ref_name }}'
+          tag_name: '${{ github.ref_name }}'
           body_path: ./changelog
           generate_release_notes: true
           append_body: true
@@ -236,11 +249,12 @@ jobs:
         id: bin-vars
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
+          VERSION=${GITHUB_REF#refs/tags/v}
           if [[ "${{ runner.os }}" == Windows ]]; then
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip" >> $GITHUB_OUTPUT
+            echo "asset_name=${{ env.APP_NAME }}-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip" >> $GITHUB_OUTPUT
             echo "asset_content_type=application/zip" >> $GITHUB_OUTPUT
           else
-            echo "asset_name=${{ env.APP_NAME }}-${{ env.APP_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> $GITHUB_OUTPUT
+            echo "asset_name=${{ env.APP_NAME }}-${VERSION}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" >> $GITHUB_OUTPUT
             echo "asset_content_type=application/gzip" >> $GITHUB_OUTPUT
           fi
 
@@ -269,7 +283,8 @@ jobs:
         id: deb-vars
         run: |
           echo "upload_url=$(cat upload_url.txt)" >> $GITHUB_OUTPUT
-          echo "asset_name=${{ env.APP_NAME }}_${{ env.APP_VERSION }}-1_${{ matrix.arch }}.deb" >> $GITHUB_OUTPUT
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "asset_name=${{ env.APP_NAME }}_${VERSION}-1_${{ matrix.arch }}.deb" >> $GITHUB_OUTPUT
           echo "asset_content_type=application/vnd.debian.binary-package" >> $GITHUB_OUTPUT
 
       - name: Upload binary assets to release

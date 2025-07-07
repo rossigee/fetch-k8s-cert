@@ -53,7 +53,7 @@ jobs:
 
       - name: Run security scan
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        uses: securecodewarrior/github-action-gosec@master
+        uses: securecodewarrior/github-action-gosec@v1
         with:
           args: '-fmt sarif -out gosec.sarif ./...'
 

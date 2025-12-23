@@ -40,8 +40,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Run linter
-        uses: golangci/golangci-lint-action@v7
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
         with:
           version: 2.7.2
           only-new-issues: true

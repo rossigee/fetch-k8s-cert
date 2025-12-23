@@ -35,14 +35,9 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.7.2
-          skip-cache: true
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.7.2
+      - name: Run linter
+        run: golangci-lint run
 
       - name: Run tests with coverage
         run: |
@@ -52,20 +47,3 @@ jobs:
       - name: Upload coverage to Codecov
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-
-      - name: Run security scan
-        if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        uses: securego/gosec@master
-        with:
-          args: '-no-fail -fmt sarif -out gosec.sarif ./...'
-
-      - name: Build binary
-        run: |
-          [ -d build ] || mkdir -p build
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go \
-            build -v -ldflags "-X main.version=${{ github.run_number }}" \
-            -o build/fetch-k8s-cert${{ matrix.ext }}

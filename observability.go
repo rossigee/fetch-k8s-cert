@@ -34,41 +34,41 @@ type ObservabilityConfig struct {
 	MetricsAddress string `yaml:"metricsAddress"` // metrics bind address (default 0.0.0.0)
 
 	// Tracing configuration
-	EnableTracing    bool   `yaml:"enableTracing"`    // enable OpenTelemetry tracing
-	TracingEndpoint  string `yaml:"tracingEndpoint"`  // OTLP endpoint URL
-	TracingHeaders   map[string]string `yaml:"tracingHeaders"` // additional headers for tracing
-	ServiceName      string `yaml:"serviceName"`      // service name for tracing
-	ServiceVersion   string `yaml:"serviceVersion"`   // service version for tracing
-	TracingSampling  float64 `yaml:"tracingSampling"` // sampling ratio (0.0 to 1.0)
+	EnableTracing   bool              `yaml:"enableTracing"`   // enable OpenTelemetry tracing
+	TracingEndpoint string            `yaml:"tracingEndpoint"` // OTLP endpoint URL
+	TracingHeaders  map[string]string `yaml:"tracingHeaders"`  // additional headers for tracing
+	ServiceName     string            `yaml:"serviceName"`     // service name for tracing
+	ServiceVersion  string            `yaml:"serviceVersion"`  // service version for tracing
+	TracingSampling float64           `yaml:"tracingSampling"` // sampling ratio (0.0 to 1.0)
 }
 
 // Metrics holds Prometheus metrics
 type Metrics struct {
 	// Operational metrics
-	FetchAttempts    *prometheus.CounterVec
-	FetchDuration    *prometheus.HistogramVec
-	FetchErrors      *prometheus.CounterVec
-	CertificateAge   *prometheus.GaugeVec
+	FetchAttempts     *prometheus.CounterVec
+	FetchDuration     *prometheus.HistogramVec
+	FetchErrors       *prometheus.CounterVec
+	CertificateAge    *prometheus.GaugeVec
 	CertificateExpiry *prometheus.GaugeVec
-	
+
 	// File operations
-	FileWrites       *prometheus.CounterVec
-	FileWriteErrors  *prometheus.CounterVec
-	ReloadAttempts   *prometheus.CounterVec
-	ReloadErrors     *prometheus.CounterVec
-	
+	FileWrites      *prometheus.CounterVec
+	FileWriteErrors *prometheus.CounterVec
+	ReloadAttempts  *prometheus.CounterVec
+	ReloadErrors    *prometheus.CounterVec
+
 	// Certificate validation
-	CertValidation   *prometheus.CounterVec
-	CAExtractions    *prometheus.CounterVec
+	CertValidation     *prometheus.CounterVec
+	CAExtractions      *prometheus.CounterVec
 	CAExtractionErrors *prometheus.CounterVec
 }
 
 // ObservabilityManager manages all observability features
 type ObservabilityManager struct {
-	config     ObservabilityConfig
-	logger     *logrus.Logger
-	metrics    *Metrics
-	tracer     oteltrace.Tracer
+	config         ObservabilityConfig
+	logger         *logrus.Logger
+	metrics        *Metrics
+	tracer         oteltrace.Tracer
 	tracerProvider *trace.TracerProvider
 	metricsServer  *http.Server
 }
@@ -271,7 +271,7 @@ func (om *ObservabilityManager) startMetricsServer() error {
 
 	mux := http.NewServeMux()
 	mux.Handle(path, promhttp.Handler())
-	
+
 	// Add health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

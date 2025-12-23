@@ -179,7 +179,7 @@ func generateCertificate(template, parent *x509.Certificate, publicKey, privateK
 	if err != nil {
 		return nil, err
 	}
-	
+
 	pemBlock := &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certDER,
@@ -193,17 +193,17 @@ func createTestCertificateChain() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	intermediateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create root CA certificate
 	rootTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -218,12 +218,12 @@ func createTestCertificateChain() ([]byte, error) {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
-	
+
 	rootCertPEM, err := generateCertificate(rootTemplate, rootTemplate, &rootKey.PublicKey, rootKey)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create intermediate CA certificate
 	intermediateTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
@@ -238,19 +238,19 @@ func createTestCertificateChain() ([]byte, error) {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
-	
+
 	// Parse root certificate to use as parent
 	rootBlock, _ := pem.Decode(rootCertPEM)
 	rootCert, err := x509.ParseCertificate(rootBlock.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	intermediateCertPEM, err := generateCertificate(intermediateTemplate, rootCert, &intermediateKey.PublicKey, rootKey)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create server certificate
 	serverTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(3),
@@ -265,25 +265,25 @@ func createTestCertificateChain() ([]byte, error) {
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		DNSNames:    []string{"test.example.com"},
 	}
-	
+
 	// Parse intermediate certificate to use as parent
 	intermediateBlock, _ := pem.Decode(intermediateCertPEM)
 	intermediateCert, err := x509.ParseCertificate(intermediateBlock.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	serverCertPEM, err := generateCertificate(serverTemplate, intermediateCert, &serverKey.PublicKey, intermediateKey)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Combine server + intermediate + root certificates into chain
 	var chainBuffer bytes.Buffer
 	chainBuffer.Write(serverCertPEM)
 	chainBuffer.Write(intermediateCertPEM)
 	chainBuffer.Write(rootCertPEM)
-	
+
 	return chainBuffer.Bytes(), nil
 }
 
@@ -294,28 +294,28 @@ func TestExtractIntermediateCAFromCertChain_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test certificate chain: %v", err)
 	}
-	
+
 	intermediatePEM, err := ExtractIntermediateCAFromCertChain(certChain)
 	if err != nil {
 		t.Fatalf("Failed to extract intermediate CA: %v", err)
 	}
-	
+
 	// Parse the extracted intermediate CA
 	block, _ := pem.Decode(intermediatePEM)
 	if block == nil {
 		t.Fatal("Failed to decode intermediate CA PEM")
 	}
-	
+
 	intermediateCert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		t.Fatalf("Failed to parse intermediate CA certificate: %v", err)
 	}
-	
+
 	// Verify it's the intermediate CA
 	if intermediateCert.Subject.CommonName != "Test Intermediate CA" {
 		t.Errorf("Expected intermediate CA common name 'Test Intermediate CA', got '%s'", intermediateCert.Subject.CommonName)
 	}
-	
+
 	if !intermediateCert.IsCA {
 		t.Error("Expected intermediate certificate to be a CA")
 	}
@@ -326,19 +326,19 @@ func TestExtractIntermediateCAFromCertChain_InsufficientCerts(t *testing.T) {
 	rootKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	rootTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{CommonName: "Test Root CA"},
+		Subject:      pkix.Name{CommonName: "Test Root CA"},
 		NotBefore:    time.Now(),
 		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
 		IsCA:         true,
 	}
-	
+
 	singleCertPEM, _ := generateCertificate(rootTemplate, rootTemplate, &rootKey.PublicKey, rootKey)
-	
+
 	_, err := ExtractIntermediateCAFromCertChain(singleCertPEM)
 	if err == nil {
 		t.Error("Expected error for insufficient certificates, got nil")
 	}
-	
+
 	expectedError := "certificate chain must contain at least 2 certificates"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error containing '%s', got '%s'", expectedError, err.Error())
@@ -347,7 +347,7 @@ func TestExtractIntermediateCAFromCertChain_InsufficientCerts(t *testing.T) {
 
 func TestExtractIntermediateCAFromCertChain_InvalidPEM(t *testing.T) {
 	invalidPEM := []byte("invalid PEM data")
-	
+
 	_, err := ExtractIntermediateCAFromCertChain(invalidPEM)
 	if err == nil {
 		t.Error("Expected error for invalid PEM, got nil")
@@ -359,33 +359,33 @@ func TestExtractTLSBundleWithIntermediateCA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test certificate chain: %v", err)
 	}
-	
+
 	// Create a mock secret with certificate chain
 	encodedCertChain := base64.StdEncoding.EncodeToString(certChain)
 	encodedCA := base64.StdEncoding.EncodeToString([]byte("mock-root-ca"))
 	encodedKey := base64.StdEncoding.EncodeToString([]byte("mock-private-key"))
-	
-	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, 
+
+	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`,
 		encodedCA, encodedCertChain, encodedKey)
-	
+
 	// Test with useIntermediateCA enabled
 	config := Config{UseIntermediateCA: true}
 	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
-	
+
 	// Verify the CA data is the intermediate CA
 	block, _ := pem.Decode(bundle.CAData)
 	if block == nil {
 		t.Fatal("Failed to decode CA data")
 	}
-	
+
 	caCert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		t.Fatalf("Failed to parse CA certificate: %v", err)
 	}
-	
+
 	if caCert.Subject.CommonName != "Test Intermediate CA" {
 		t.Errorf("Expected intermediate CA, got '%s'", caCert.Subject.CommonName)
 	}
@@ -396,23 +396,23 @@ func TestExtractTLSBundleWithoutIntermediateCA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test certificate chain: %v", err)
 	}
-	
+
 	// Create a mock secret with certificate chain
 	encodedCertChain := base64.StdEncoding.EncodeToString(certChain)
 	mockRootCA := []byte("mock-root-ca-data")
 	encodedCA := base64.StdEncoding.EncodeToString(mockRootCA)
 	encodedKey := base64.StdEncoding.EncodeToString([]byte("mock-private-key"))
-	
-	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, 
+
+	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`,
 		encodedCA, encodedCertChain, encodedKey)
-	
+
 	// Test with useIntermediateCA disabled (default)
 	config := Config{UseIntermediateCA: false}
 	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
-	
+
 	// Verify the CA data is from ca.crt field
 	if !bytes.Equal(bundle.CAData, mockRootCA) {
 		t.Error("Expected CA data from ca.crt field, got different data")
@@ -424,16 +424,16 @@ func TestParseCertificateChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test certificate chain: %v", err)
 	}
-	
+
 	certs, err := parseCertificateChain(certChain)
 	if err != nil {
 		t.Fatalf("Failed to parse certificate chain: %v", err)
 	}
-	
+
 	if len(certs) != 3 {
 		t.Errorf("Expected 3 certificates, got %d", len(certs))
 	}
-	
+
 	// Verify order: server, intermediate, root
 	expectedCNs := []string{"test.example.com", "Test Intermediate CA", "Test Root CA"}
 	for i, cert := range certs {
@@ -448,41 +448,41 @@ func TestCertificateToPEM(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{CommonName: "Test Certificate"},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+		Subject:      pkix.Name{CommonName: "Test Certificate"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
 	}
-	
+
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	if err != nil {
 		t.Fatalf("Failed to create certificate: %v", err)
 	}
-	
+
 	cert, err := x509.ParseCertificate(certDER)
 	if err != nil {
 		t.Fatalf("Failed to parse certificate: %v", err)
 	}
-	
+
 	pemData, err := certificateToPEM(cert)
 	if err != nil {
 		t.Fatalf("Failed to convert certificate to PEM: %v", err)
 	}
-	
+
 	// Verify the PEM can be decoded back
 	block, _ := pem.Decode(pemData)
 	if block == nil {
 		t.Fatal("Failed to decode PEM")
 	}
-	
+
 	if block.Type != "CERTIFICATE" {
 		t.Errorf("Expected PEM type 'CERTIFICATE', got '%s'", block.Type)
 	}
-	
+
 	decodedCert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		t.Fatalf("Failed to parse decoded certificate: %v", err)
 	}
-	
+
 	if decodedCert.Subject.CommonName != "Test Certificate" {
 		t.Errorf("Expected CN 'Test Certificate', got '%s'", decodedCert.Subject.CommonName)
 	}
@@ -523,34 +523,34 @@ func TestExtractIntermediateCA_SelfSignedCertificate(t *testing.T) {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{CommonName: "Self-Signed Certificate"},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
-		IsCA:        true,
+		Subject:      pkix.Name{CommonName: "Self-Signed Certificate"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		IsCA:         true,
 	}
-	
+
 	certPEM, _ := generateCertificate(template, template, &key.PublicKey, key)
-	
+
 	// Add another unrelated certificate
 	otherKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	otherTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
-		Subject: pkix.Name{CommonName: "Other Certificate"},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+		Subject:      pkix.Name{CommonName: "Other Certificate"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
 	}
 	otherCertPEM, _ := generateCertificate(otherTemplate, otherTemplate, &otherKey.PublicKey, otherKey)
-	
+
 	// Combine into chain
 	var chainBuffer bytes.Buffer
 	chainBuffer.Write(certPEM)
 	chainBuffer.Write(otherCertPEM)
-	
+
 	_, err := ExtractIntermediateCAFromCertChain(chainBuffer.Bytes())
 	if err == nil {
 		t.Error("Expected error for self-signed certificate with no valid issuer, got nil")
 	}
-	
+
 	expectedError := "could not find intermediate CA"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error containing '%s', got '%s'", expectedError, err.Error())
@@ -560,13 +560,13 @@ func TestExtractIntermediateCA_SelfSignedCertificate(t *testing.T) {
 func TestExtractTLSBundle_MissingSecretFields(t *testing.T) {
 	// Test with missing tls.crt field
 	secretData := `{"data": {"ca.crt": "Y2EtZGF0YQ==", "tls.key": "a2V5LWRhdGE="}}`
-	
+
 	config := Config{UseIntermediateCA: false}
 	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err == nil {
 		t.Error("Expected error for missing tls.crt field, got nil")
 	}
-	
+
 	expectedError := "TLS certificate or key not found in secret data"
 	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("Expected error containing '%s', got '%s'", expectedError, err.Error())
@@ -576,7 +576,7 @@ func TestExtractTLSBundle_MissingSecretFields(t *testing.T) {
 func TestExtractTLSBundle_InvalidBase64(t *testing.T) {
 	// Test with invalid base64 data
 	secretData := `{"data": {"ca.crt": "invalid-base64!", "tls.crt": "Y2VydC1kYXRh", "tls.key": "a2V5LWRhdGE="}}`
-	
+
 	config := Config{UseIntermediateCA: false}
 	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err == nil {
@@ -587,7 +587,7 @@ func TestExtractTLSBundle_InvalidBase64(t *testing.T) {
 func TestExtractTLSBundle_InvalidJSON(t *testing.T) {
 	// Test with invalid JSON
 	secretData := `{"data": {malformed json`
-	
+
 	config := Config{UseIntermediateCA: false}
 	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err == nil {
@@ -599,21 +599,21 @@ func TestExtractTLSBundle_IntermediateCAFallback(t *testing.T) {
 	// Test fallback to ca.crt when intermediate extraction fails
 	invalidCertChain := []byte("invalid certificate data")
 	encodedInvalidChain := base64.StdEncoding.EncodeToString(invalidCertChain)
-	
+
 	mockRootCA := []byte("fallback-root-ca-data")
 	encodedCA := base64.StdEncoding.EncodeToString(mockRootCA)
 	encodedKey := base64.StdEncoding.EncodeToString([]byte("mock-private-key"))
-	
-	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, 
+
+	secretData := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`,
 		encodedCA, encodedInvalidChain, encodedKey)
-	
+
 	// Test with useIntermediateCA enabled but fallback should occur
 	config := Config{UseIntermediateCA: true}
 	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
 	if err != nil {
 		t.Fatalf("Expected successful fallback, got error: %v", err)
 	}
-	
+
 	// Should have fallen back to ca.crt
 	if !bytes.Equal(bundle.CAData, mockRootCA) {
 		t.Error("Expected fallback to ca.crt data")
@@ -627,7 +627,7 @@ func BenchmarkExtractIntermediateCA(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create test certificate chain: %v", err)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := ExtractIntermediateCAFromCertChain(certChain)
@@ -642,7 +642,7 @@ func BenchmarkParseCertificateChain(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create test certificate chain: %v", err)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := parseCertificateChain(certChain)

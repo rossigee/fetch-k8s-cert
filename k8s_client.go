@@ -62,8 +62,8 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 	}
 
 	start := time.Now()
-	
-	url := fmt.Sprintf("%s/api/v1/namespaces/%s/secrets/%s", 
+
+	url := fmt.Sprintf("%s/api/v1/namespaces/%s/secrets/%s",
 		k.config.K8SAPIURL, k.config.Namespace, k.config.SecretName)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -100,11 +100,11 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		} else if resp.StatusCode == http.StatusNotFound {
 			errorType = "not_found"
 		}
-		
+
 		if obs != nil && obs.metrics != nil {
 			obs.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, errorType)
 		}
-		
+
 		err := fmt.Errorf("unexpected response status: %s", resp.Status)
 		if span != nil {
 			span.RecordError(err)
@@ -135,7 +135,7 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 	}
 
 	duration := time.Since(start)
-	
+
 	// Record successful metrics
 	if obs != nil && obs.metrics != nil {
 		obs.metrics.RecordFetchAttempt(k.config.Namespace, k.config.SecretName, "success")

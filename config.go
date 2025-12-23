@@ -10,18 +10,18 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	K8SAPIURL               string              `yaml:"k8sAPIURL"`
-	K8SCACertFile           string              `yaml:"k8sCACertFile"`
-	SkipTLSVerification     bool                `yaml:"skipTLSVerification"`
-	Token                   string              `yaml:"token"`
-	Namespace               string              `yaml:"namespace"`
-	SecretName              string              `yaml:"secretName"`
-	LocalCAFile             string              `yaml:"localCAFile"`
-	LocalCertFile           string              `yaml:"localCertFile"`
-	LocalKeyFile            string              `yaml:"localKeyFile"`
-	ReloadCommand           string              `yaml:"reloadCommand"`
-	UseIntermediateCA       bool                `yaml:"useIntermediateCA"`
-	Observability           ObservabilityConfig `yaml:"observability"`
+	K8SAPIURL           string              `yaml:"k8sAPIURL"`
+	K8SCACertFile       string              `yaml:"k8sCACertFile"`
+	SkipTLSVerification bool                `yaml:"skipTLSVerification"`
+	Token               string              `yaml:"token"`
+	Namespace           string              `yaml:"namespace"`
+	SecretName          string              `yaml:"secretName"`
+	LocalCAFile         string              `yaml:"localCAFile"`
+	LocalCertFile       string              `yaml:"localCertFile"`
+	LocalKeyFile        string              `yaml:"localKeyFile"`
+	ReloadCommand       string              `yaml:"reloadCommand"`
+	UseIntermediateCA   bool                `yaml:"useIntermediateCA"`
+	Observability       ObservabilityConfig `yaml:"observability"`
 }
 
 // LoadConfigFromFile loads configuration from a YAML file

@@ -70,7 +70,7 @@ func (fm *FileManager) UpdateCertificateFiles(ctx context.Context, tlsBundle *TL
 	}
 
 	anyChanged := caChanged || certChanged || keyChanged
-	
+
 	if span != nil {
 		span.SetAttributes(
 			attribute.Bool("ca_changed", caChanged),
@@ -110,7 +110,7 @@ func (fm *FileManager) updateFileIfDifferent(filePath string, data []byte, permi
 		if obs != nil && obs.logger != nil {
 			obs.logger.WithField("file", filePath).Info("Local file doesn't exist, creating new file")
 		}
-		
+
 		err = fm.writeToFile(data, filePath, permissions, fileType)
 		if err != nil {
 			if obs != nil && obs.logger != nil {
@@ -118,7 +118,7 @@ func (fm *FileManager) updateFileIfDifferent(filePath string, data []byte, permi
 			}
 			return false, err
 		}
-		
+
 		if obs != nil && obs.metrics != nil {
 			obs.metrics.RecordFileWrite(fileType, "created")
 		}
@@ -151,12 +151,12 @@ func (fm *FileManager) updateFileIfDifferent(filePath string, data []byte, permi
 	if obs != nil && obs.metrics != nil {
 		obs.metrics.RecordFileWrite(fileType, "updated")
 	}
-	
+
 	if obs != nil && obs.logger != nil {
 		obs.logger.WithFields(map[string]interface{}{
-			"file":        filePath,
-			"type":        fileType,
-			"size_bytes":  len(data),
+			"file":       filePath,
+			"type":       fileType,
+			"size_bytes": len(data),
 		}).Info("File updated with new content")
 	}
 
@@ -205,7 +205,7 @@ func (fm *FileManager) TriggerReload(ctx context.Context) error {
 	}
 
 	start := time.Now()
-	
+
 	if obs != nil && obs.logger != nil {
 		obs.logger.WithField("command", fm.config.ReloadCommand).Info("Certificate files updated, triggering reload")
 	}
@@ -213,22 +213,22 @@ func (fm *FileManager) TriggerReload(ctx context.Context) error {
 	reloadCmd := exec.CommandContext(ctx, "sh", "-c", fm.config.ReloadCommand)
 	reloadCmd.Stdout = os.Stdout
 	reloadCmd.Stderr = os.Stderr
-	
+
 	if err := reloadCmd.Run(); err != nil {
 		duration := time.Since(start)
-		
+
 		if obs != nil && obs.metrics != nil {
 			obs.metrics.RecordReloadAttempt("failed")
 			obs.metrics.RecordReloadError("command_failed")
 		}
-		
+
 		if obs != nil && obs.logger != nil {
 			obs.logger.WithError(err).WithFields(map[string]interface{}{
 				"command":  fm.config.ReloadCommand,
 				"duration": duration,
 			}).Error("Error executing reload command")
 		}
-		
+
 		if span != nil {
 			span.RecordError(err)
 			span.SetAttributes(
@@ -236,23 +236,23 @@ func (fm *FileManager) TriggerReload(ctx context.Context) error {
 				attribute.Float64("duration_seconds", duration.Seconds()),
 			)
 		}
-		
+
 		return fmt.Errorf("error triggering reload command: %w", err)
 	}
 
 	duration := time.Since(start)
-	
+
 	if obs != nil && obs.metrics != nil {
 		obs.metrics.RecordReloadAttempt("success")
 	}
-	
+
 	if obs != nil && obs.logger != nil {
 		obs.logger.WithFields(map[string]interface{}{
 			"command":  fm.config.ReloadCommand,
 			"duration": duration,
 		}).Info("Reload command executed successfully")
 	}
-	
+
 	if span != nil {
 		span.SetAttributes(
 			attribute.Bool("success", true),

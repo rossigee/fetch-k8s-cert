@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2025-12-23
+
+### 🔧 Improvements
+
+- **Go Version**: Updated minimum Go version to 1.25.5 for improved performance and security
+- **Dependencies**: Updated dependencies for compatibility with Go 1.25.5
+
+---
+
 ## [2.0.0] - 2025-07-07
 
 ### 🚀 Major Release - Complete Architecture Overhaul
@@ -71,7 +80,7 @@ This is a major release with significant architectural improvements, comprehensi
 - **Configuration Structure**: New `observability` section in YAML configuration
 - **Function Names**: Internal function names changed (affects custom integrations)
 - **Import Paths**: Internal package structure reorganized
-- **Minimum Go Version**: Requires Go 1.24+
+- **Minimum Go Version**: Requires Go 1.25.5+
 
 ### 📊 Metrics Available
 

@@ -58,7 +58,7 @@ func main() {
 	// Handle shutdown signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	go func() {
 		sig := <-sigChan
 		log.WithField("signal", sig.String()).Info("Received shutdown signal")
@@ -81,10 +81,10 @@ func main() {
 // run executes the main application logic
 func run(ctx context.Context, config Config) error {
 	log.WithFields(logrus.Fields{
-		"version":     version,
-		"namespace":   config.Namespace,
-		"secret":      config.SecretName,
-		"k8s_api":     config.K8SAPIURL,
+		"version":             version,
+		"namespace":           config.Namespace,
+		"secret":              config.SecretName,
+		"k8s_api":             config.K8SAPIURL,
 		"use_intermediate_ca": config.UseIntermediateCA,
 	}).Info("Starting fetch-k8s-cert")
 

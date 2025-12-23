@@ -41,24 +41,24 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode certificate data: %w", err)
 	}
-	
+
 	decodedKey, err := base64.StdEncoding.DecodeString(keyData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode key data: %w", err)
 	}
 
 	var finalCAData []byte
-	
+
 	// If useIntermediateCA is enabled, extract the intermediate CA from the certificate chain
 	if config.UseIntermediateCA {
 		if obs != nil && obs.logger != nil {
 			obs.logger.Info("Extracting intermediate CA from certificate chain")
 		}
-		
+
 		if obs != nil && obs.metrics != nil {
 			obs.metrics.RecordCAExtraction("intermediate", "attempt")
 		}
-		
+
 		intermediateCA, err := ExtractIntermediateCAFromCertChain(decodedCert)
 		if err != nil {
 			if obs != nil && obs.logger != nil {
@@ -68,7 +68,7 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 				obs.metrics.RecordCAExtractionError("intermediate_extraction")
 				obs.metrics.RecordCAExtraction("fallback", "success")
 			}
-			
+
 			// Fall back to the original ca.crt
 			finalCAData, err = base64.StdEncoding.DecodeString(caData)
 			if err != nil {
@@ -96,33 +96,33 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 		CertData: decodedCert,
 		KeyData:  decodedKey,
 	}
-	
+
 	// Extract certificate information for metrics
 	if obs != nil && obs.metrics != nil {
 		if certInfo, err := parseCertificateInfo(decodedCert); err == nil {
 			namespace := config.Namespace
 			secret := config.SecretName
-			
+
 			now := time.Now()
 			age := now.Sub(certInfo.NotBefore)
 			timeToExpiry := certInfo.NotAfter.Sub(now)
-			
+
 			obs.metrics.SetCertificateAge(namespace, secret, age)
 			obs.metrics.SetCertificateExpiry(namespace, secret, timeToExpiry)
-			
+
 			if obs.logger != nil {
 				obs.logger.WithFields(map[string]interface{}{
-					"subject":     certInfo.Subject.CommonName,
-					"issuer":      certInfo.Issuer.CommonName,
-					"not_before":  certInfo.NotBefore,
-					"not_after":   certInfo.NotAfter,
-					"age_days":    int(age.Hours() / 24),
+					"subject":         certInfo.Subject.CommonName,
+					"issuer":          certInfo.Issuer.CommonName,
+					"not_before":      certInfo.NotBefore,
+					"not_after":       certInfo.NotAfter,
+					"age_days":        int(age.Hours() / 24),
 					"expires_in_days": int(timeToExpiry.Hours() / 24),
 				}).Info("Certificate information extracted")
 			}
 		}
 	}
-	
+
 	return tlsBundle, nil
 }
 
@@ -134,7 +134,7 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 		_, span = obs.tracer.Start(nil, "certificate.extract_intermediate_ca")
 		defer span.End()
 	}
-	
+
 	certificates, err := parseCertificateChain(certChainPEM)
 	if err != nil {
 		if span != nil {
@@ -142,7 +142,7 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 		}
 		return nil, err
 	}
-	
+
 	if len(certificates) < 2 {
 		err := fmt.Errorf("certificate chain must contain at least 2 certificates (server + issuer), found %d", len(certificates))
 		if span != nil {
@@ -150,13 +150,13 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 		}
 		return nil, err
 	}
-	
+
 	// The server certificate is typically the first one
 	serverCert := certificates[0]
 	if obs != nil && obs.logger != nil {
 		obs.logger.WithField("subject", serverCert.Subject.CommonName).Info("Server certificate subject")
 	}
-	
+
 	// Find the certificate that issued the server certificate
 	for i, cert := range certificates[1:] {
 		if err := serverCert.CheckSignatureFrom(cert); err == nil {
@@ -167,18 +167,18 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 					"subject":  cert.Subject.CommonName,
 				}).Info("Found intermediate CA")
 			}
-			
+
 			if span != nil {
 				span.SetAttributes(
 					attribute.String("intermediate_ca_subject", cert.Subject.CommonName),
 					attribute.Int("chain_position", i+1),
 				)
 			}
-			
+
 			return certificateToPEM(cert)
 		}
 	}
-	
+
 	err = fmt.Errorf("could not find intermediate CA that issued the server certificate")
 	if span != nil {
 		span.RecordError(err)
@@ -190,7 +190,7 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 // all certificates as x509.Certificate objects
 func parseCertificateChain(certChainPEM []byte) ([]*x509.Certificate, error) {
 	var certificates []*x509.Certificate
-	
+
 	rest := certChainPEM
 	for {
 		var block *pem.Block
@@ -206,7 +206,7 @@ func parseCertificateChain(certChainPEM []byte) ([]*x509.Certificate, error) {
 			certificates = append(certificates, cert)
 		}
 	}
-	
+
 	return certificates, nil
 }
 
@@ -225,6 +225,6 @@ func parseCertificateInfo(certPEM []byte) (*x509.Certificate, error) {
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM certificate")
 	}
-	
+
 	return x509.ParseCertificate(block.Bytes)
 }

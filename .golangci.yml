@@ -1,4 +1,4 @@
-version: 2
+version: "2"
 
 
 
@@ -8,41 +8,7 @@ run:
   tests: true
 
 output:
-  formats:
-    colored-line-number:
-      path: stdout
-  print-issued-lines: true
-  print-linter-name: true
 
-linters-settings:
-  gocyclo:
-    min-complexity: 15
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  misspell:
-    locale: US
-  lll:
-    line-length: 140
-  goimports:
-    local-prefixes: github.com/rossigee/fetch-k8s-cert
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-  funlen:
-    lines: 100
-    statements: 50
 
 linters:
   enable:
@@ -80,18 +46,3 @@ linters:
     - ineffassign
     - prealloc
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gomnd
-        - funlen
-        - gocyclo
-    - linters:
-        - lll
-      source: "^//go:generate "
-
-  exclude-use-default: false
-  exclude:
-    - 'declaration of "(err|ctx)" shadows declaration at'
-    - 'shadow: declaration of "err" shadows declaration'

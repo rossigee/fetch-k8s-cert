@@ -73,7 +73,7 @@ jobs:
           make deb
 
       - name: Run linter
-        run: ./golangci-lint run
+        run: ./golangci-lint-2.7.2-linux-${{ matrix.arch }}/golangci-lint run
 
       - name: Run tests with coverage
         run: |

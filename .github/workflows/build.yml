@@ -76,7 +76,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run linter
-        run: ./golangci-lint run
+        run: ./golangci-lint-2.7.2-linux-${{ matrix.arch }}/golangci-lint run
 
   security:
     name: Security Scan

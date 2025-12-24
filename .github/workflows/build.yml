@@ -1,5 +1,5 @@
 ---
-name: Build
+name: CI
 
 on:
   workflow_call:
@@ -8,10 +8,124 @@ on:
       - "master"
       - "develop"
 
-jobs:
-  build:
-    runs-on: ${{ matrix.runner }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+env:
+  GO_VERSION: '1.25.5'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+            ${{ runner.os }}-go-
+
+      - name: Run tests with coverage
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+            ${{ runner.os }}-go-
+
+      - name: Run linter
+        run: ./golangci-lint run
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+            ${{ runner.os }}-go-
+
+      - name: Run security scan
+        uses: securego/gosec@master
+        with:
+          args: '-fmt sarif -out gosec-report.sarif -stdout -verbose=text ./...'
+
+      - name: Run govulncheck vulnerability scanner
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      - name: Upload security results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('gosec-report.sarif') != ''
+        with:
+          sarif_file: gosec-report.sarif
+
+  build:
+    name: Build
+    runs-on: ${{ matrix.runner }}
+    needs: [test, lint, security]
     strategy:
       matrix:
         include:
@@ -21,32 +135,100 @@ jobs:
           - os: linux
             arch: arm64
             runner: ubuntu-24.04-arm
-          # - os: macosx
-          #   arch: arm64
-          #   runner: macos-latest
-          # - os: windows
-          #   arch: x64
-          #   runner: windows-latest
-          #?   ext: '.exe'
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
-      - name: Run linter
-        run: ./golangci-lint run
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - name: Run tests with coverage
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+            ${{ runner.os }}-go-
+
+      - name: Build package
         run: |
-          curl -L https://github.com/golangci/golangci-lint/releases/download/v2.7.2/golangci-lint-2.7.2-linux-${{ matrix.arch }}.tar.gz -o golangci-lint.tar.gz
-          tar -xzf golangci-lint.tar.gz
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
-            go test -v -race -coverprofile=coverage.out -covermode=atomic
+          make build
 
-      - name: Upload coverage to Codecov
+      - name: Build Docker image
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        uses: codecov/codecov-action@v4
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: |
+            fetch-k8s-cert:test
+
+      - name: Run Trivy vulnerability scanner
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'fetch-k8s-cert:test'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+            ${{ runner.os }}-go-
+
+      - name: Run benchmarks
+        run: |
+          go test -bench=. -benchmem -run=^$ ./... | tee benchmark.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark.txt
+
+      - name: Compare benchmarks
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push'
+        with:
+          tool: 'go'
+          output-file-path: benchmark.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-on-alert: true
+          alert-threshold: '200%'
+          fail-on-alert: true

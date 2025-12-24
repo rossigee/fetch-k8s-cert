@@ -41,7 +41,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run tests with coverage
-        run: |
+        run:
           go test -v -race -coverprofile=coverage.out -covermode=atomic
 
       - name: Upload coverage to Codecov
@@ -112,7 +112,7 @@ jobs:
           args: '-fmt sarif -out gosec-report.sarif -stdout -verbose=text ./...'
 
       - name: Run govulncheck vulnerability scanner
-        run: |
+        run:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
@@ -158,7 +158,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build package
-        run: |
+        run:
           make build
 
       - name: Build Docker image
@@ -210,7 +210,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run benchmarks
-        run: |
+        run:
           go test -bench=. -benchmem -run=^$ ./... | tee benchmark.txt
 
       - name: Upload benchmark results

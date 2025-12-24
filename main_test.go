@@ -122,7 +122,7 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 }
 
 func setupTempDir() string {
-	tempDir := os.TempDir()
+	tempDir := os.TempDir() // #nosec G303
 	testDir := filepath.Join(tempDir, "test-fetch-k8s-cert", strconv.FormatInt(time.Now().UnixNano(), 10))
 	err := os.MkdirAll(testDir, 0755)
 	if err != nil {

@@ -30,8 +30,8 @@ func (fm *FileManager) UpdateCertificateFiles(ctx context.Context, tlsBundle *TL
 		defer span.End()
 	}
 
-	certPermissions := os.FileMode(0644) // world-readable
-	keyPermissions := os.FileMode(0640)  // group-readable
+	certPermissions := os.FileMode(0600) // owner-readable
+	keyPermissions := os.FileMode(0600)  // owner-readable
 
 	// Update CA file
 	caChanged, err := fm.updateFileIfDifferent(fm.config.LocalCAFile, tlsBundle.CAData, certPermissions, "ca")
@@ -210,7 +210,7 @@ func (fm *FileManager) TriggerReload(ctx context.Context) error {
 		obs.logger.WithField("command", fm.config.ReloadCommand).Info("Certificate files updated, triggering reload")
 	}
 
-	reloadCmd := exec.CommandContext(ctx, "sh", "-c", fm.config.ReloadCommand)
+	reloadCmd := exec.CommandContext(ctx, "sh", "-c", fm.config.ReloadCommand) // #nosec G204
 	reloadCmd.Stdout = os.Stdout
 	reloadCmd.Stderr = os.Stderr
 

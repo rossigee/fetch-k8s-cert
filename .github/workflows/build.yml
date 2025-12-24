@@ -112,7 +112,7 @@ jobs:
       - name: Run security scan
         uses: securego/gosec@master
         with:
-          args: '-fmt sarif -out gosec.sarif -stdout -verbose=text -exclude=G101,G303,G204,G302,G301 ./...'
+          args: '-fmt sarif -out gosec.sarif -stdout -verbose=text -exclude=G101 -exclude=G303 -exclude=G204 -exclude=G302 -exclude=G301 ./...'
 
       - name: Run govulncheck vulnerability scanner
         run:

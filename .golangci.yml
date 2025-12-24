@@ -1,3 +1,5 @@
+version: 2
+
 
 
 run:
@@ -7,7 +9,7 @@ run:
 
 output:
   formats:
-    - format: colored-line-number
+    colored-line-number:
       path: stdout
   print-issued-lines: true
   print-linter-name: true
@@ -54,10 +56,8 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - lll
@@ -65,8 +65,6 @@ linters:
     - nakedret
     - rowserrcheck
     - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
@@ -81,7 +79,6 @@ issues:
         - gomnd
         - funlen
         - gocyclo
-    - gofmt
     - linters:
         - lll
       source: "^//go:generate "

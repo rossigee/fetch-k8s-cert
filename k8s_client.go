@@ -21,10 +21,15 @@ type K8sClient struct {
 
 // NewK8sClient creates a new Kubernetes API client
 func NewK8sClient(config Config) (*K8sClient, error) {
+	var tlsConfig *tls.Config
+	if config.SkipTLSVerification {
+		tlsConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402
+	} else {
+		tlsConfig = &tls.Config{}
+	}
+
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.SkipTLSVerification, // #nosec G402
-		},
+		TLSClientConfig: tlsConfig,
 	}
 
 	if !config.SkipTLSVerification && config.K8SCACertFile != "" {

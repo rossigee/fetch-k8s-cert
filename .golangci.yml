@@ -1,14 +1,9 @@
 version: "2"
 
-
-
 run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
-
-output:
-
 
 linters:
   enable:
@@ -45,4 +40,3 @@ linters:
     - unparam
     - ineffassign
     - prealloc
-

@@ -75,6 +75,12 @@ jobs:
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-
             ${{ runner.os }}-go-
 
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          skip-cache: true
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -106,7 +112,7 @@ jobs:
       - name: Run security scan
         uses: securego/gosec@master
         with:
-          args: '-fmt sarif -out gosec-report.sarif -stdout -verbose=text ./...'
+          args: '-fmt sarif -out gosec.sarif -stdout -verbose=text ./...'
 
       - name: Run govulncheck vulnerability scanner
         run:
@@ -115,9 +121,9 @@ jobs:
 
       - name: Upload security results
         uses: github/codeql-action/upload-sarif@v4
-        if: always() && hashFiles('gosec-report.sarif') != ''
+        if: always() && hashFiles('gosec.sarif') != ''
         with:
-          sarif_file: gosec-report.sarif
+          sarif_file: gosec.sarif
 
   build:
     name: Build

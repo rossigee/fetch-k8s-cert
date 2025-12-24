@@ -23,7 +23,7 @@ type K8sClient struct {
 func NewK8sClient(config Config) (*K8sClient, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.SkipTLSVerification,
+			InsecureSkipVerify: config.SkipTLSVerification, // #nosec G402
 		},
 	}
 

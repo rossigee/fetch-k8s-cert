@@ -134,7 +134,8 @@ func setupTempDir() string {
 func createMockServer(statusCode int, responseBody string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
-		_ = fmt.Fprintln(w, responseBody)
+		_, err := fmt.Fprintln(w, responseBody)
+		_ = err
 	}))
 }
 

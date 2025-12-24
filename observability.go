@@ -131,7 +131,7 @@ func (om *ObservabilityManager) initLogger() error {
 
 	// Configure output
 	if om.config.LogToFile && om.config.LogFile != "" {
-		file, err := os.OpenFile(om.config.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(om.config.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}
@@ -275,7 +275,8 @@ func (om *ObservabilityManager) startMetricsServer() error {
 	// Add health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_ = w.Write([]byte("OK"))
+		_, err := w.Write([]byte("OK"))
+		_ = err
 	})
 
 	om.metricsServer = &http.Server{

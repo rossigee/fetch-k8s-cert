@@ -93,11 +93,12 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		errorType := "api_error"
-		if resp.StatusCode == http.StatusUnauthorized {
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
 			errorType = "unauthorized"
-		} else if resp.StatusCode == http.StatusForbidden {
+		case http.StatusForbidden:
 			errorType = "forbidden"
-		} else if resp.StatusCode == http.StatusNotFound {
+		case http.StatusNotFound:
 			errorType = "not_found"
 		}
 

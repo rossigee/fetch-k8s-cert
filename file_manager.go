@@ -26,7 +26,7 @@ func NewFileManager(config Config) *FileManager {
 func (fm *FileManager) UpdateCertificateFiles(ctx context.Context, tlsBundle *TLSBundle) (bool, error) {
 	var span trace.Span
 	if obs != nil && obs.tracer != nil {
-		ctx, span = obs.tracer.Start(ctx, "file_manager.update_certificate_files")
+		_, span = obs.tracer.Start(ctx, "file_manager.update_certificate_files")
 		defer span.End()
 	}
 

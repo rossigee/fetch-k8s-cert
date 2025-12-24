@@ -96,7 +96,7 @@ func (fm *FileManager) UpdateCertificateFiles(ctx context.Context, tlsBundle *TL
 func (fm *FileManager) updateFileIfDifferent(filePath string, data []byte, permissions os.FileMode, fileType string) (bool, error) {
 	// Ensure directory exists
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		if obs != nil && obs.metrics != nil {
 			obs.metrics.RecordFileWriteError(fileType, "directory_creation")
 		}
@@ -172,7 +172,7 @@ func (fm *FileManager) writeToFile(data []byte, filePath string, permissions os.
 		}
 		return fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	_, err = file.Write(data)
 	if err != nil {

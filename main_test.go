@@ -57,7 +57,7 @@ func TestMainFunction_Success(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to open CA certificate file: %v", err)
 		}
-		defer caFile.Close()
+		defer func() { _ = caFile.Close() }()
 		var caData bytes.Buffer
 		_, err = io.Copy(&caData, caFile)
 		if err != nil {
@@ -134,7 +134,7 @@ func setupTempDir() string {
 func createMockServer(statusCode int, responseBody string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
-		fmt.Fprintln(w, responseBody)
+		_ = fmt.Fprintln(w, responseBody)
 	}))
 }
 
@@ -149,7 +149,7 @@ func containsLogMessage(messages []string, targetMessage string) bool {
 
 func runTestWithConfig(t *testing.T, requestBody string, testFunc func(config Config)) {
 	tempDir := setupTempDir()
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	mockServer := createMockServer(http.StatusOK, requestBody)
 	defer mockServer.Close()

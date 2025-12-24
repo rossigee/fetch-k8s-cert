@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/x509"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -131,7 +132,7 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 	var span trace.Span
 	if obs != nil && obs.tracer != nil {
-		_, span = obs.tracer.Start(nil, "certificate.extract_intermediate_ca")
+		_, span = obs.tracer.Start(context.TODO(), "certificate.extract_intermediate_ca")
 		defer span.End()
 	}
 
@@ -144,7 +145,8 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 	}
 
 	if len(certificates) < 2 {
-		err := fmt.Errorf("certificate chain must contain at least 2 certificates (server + issuer), found %d", len(certificates))
+		err := fmt.Errorf("certificate chain must contain at least 2 certificates " +
+		"(server + issuer), found %d", len(certificates))
 		if span != nil {
 			span.RecordError(err)
 		}

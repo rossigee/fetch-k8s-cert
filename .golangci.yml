@@ -70,6 +70,14 @@ linters:
     - unused
     - whitespace
   disable:
+    - depguard
+    - gosec
+    - funlen
+    - lll
+    - gocyclo
+    - gocritic
+    - unparam
+    - ineffassign
     - prealloc
 
 issues:

@@ -37,8 +37,10 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v5
-          wget https://github.com/golangci/golangci-lint/releases/download/v2.7.2/golangci-lint-2.7.2-linux-${{ matrix.arch }}.tar.gz
-          tar -xzf golangci-lint-2.7.2-linux-${{ matrix.arch }}.tar.gz
+        with:
+          go-version-file: 'go.mod'
+          curl -L https://github.com/golangci/golangci-lint/releases/download/v2.7.2/golangci-lint-2.7.2-linux-${{ matrix.arch }}.tar.gz -o golangci-lint.tar.gz
+          tar -xzf golangci-lint.tar.gz
       - name: Run linter
         run: ./golangci-lint run
 

@@ -3,13 +3,13 @@ module github.com/rossigee/fetch-k8s-cert
 go 1.25.5
 
 require (
-	github.com/goccy/go-yaml v1.19.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sirupsen/logrus v1.9.3
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.39.0
 	go.opentelemetry.io/otel/sdk v1.39.0
 	go.opentelemetry.io/otel/trace v1.39.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

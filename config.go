@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/goccy/go-yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // Config represents the application configuration

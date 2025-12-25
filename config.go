@@ -28,7 +28,7 @@ type Config struct {
 
 // LoadConfigFromFile loads configuration from a YAML file
 func LoadConfigFromFile(filePath string) (*Config, error) {
-	configData, err := readFile(filePath)
+	configData, err := readFile(filePath) // #nosec G304
 	if err != nil {
 		return nil, fmt.Errorf("error reading config file from '%s': %w", filePath, err)
 	}

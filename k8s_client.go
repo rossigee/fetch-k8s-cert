@@ -33,7 +33,7 @@ func NewK8sClient(config Config) (*K8sClient, error) {
 	}
 
 	if !config.SkipTLSVerification && config.K8SCACertFile != "" {
-		caCert, err := readFile(config.K8SCACertFile)
+		caCert, err := readFile(config.K8SCACertFile) // #nosec G304
 		if err != nil {
 			return nil, fmt.Errorf("error reading CA certificate file: %w", err)
 		}

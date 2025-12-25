@@ -82,6 +82,7 @@ jobs:
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: securego/gosec@master
       - name: Run govulncheck vulnerability scanner
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: golang/govulncheck-action@v1
 
 

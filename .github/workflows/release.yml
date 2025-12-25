@@ -71,7 +71,7 @@ jobs:
         run: make deb
 
       - name: Run tests with coverage
-        run:
+        run: |
           curl -L https://github.com/golangci/golangci-lint/releases/download/v2.7.2/golangci-lint-2.7.2-linux-${{ matrix.arch }}.tar.gz -o golangci-lint.tar.gz
           tar -xzf golangci-lint.tar.gz
           chmod +x ./golangci-lint
@@ -81,6 +81,10 @@ jobs:
       - name: Run security scan
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: securego/gosec@master
+      - name: Run govulncheck vulnerability scanner
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
 
       - name: Login to Container Registry
         uses: docker/login-action@v3
@@ -90,13 +94,13 @@ jobs:
           password: ${{ secrets.PAT_TOKEN }}
 
       - name: Verify Docker buildx
-        run:
+        run: |
           docker buildx version
           docker buildx ls
 
       - name: Set build date
         id: date
-        run: echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+        run: | echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -116,7 +120,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Generate changelog
-        run:
+        run: |
           if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
             PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1)
             echo "## Changes since $PREVIOUS_TAG" > CHANGELOG.md
@@ -127,7 +131,7 @@ jobs:
           fi
 
       - name: Build release binaries
-        run:
+        run: |
           mkdir -p dist/binaries
           VERSION=${GITHUB_REF_NAME#v}
           LDFLAGS="-w -s -X main.version=$VERSION -X main.commit=$(git rev-parse --short HEAD)"

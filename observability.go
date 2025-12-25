@@ -281,6 +281,7 @@ func (om *ObservabilityManager) startMetricsServer() error {
 	om.metricsServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", address, port),
 		Handler: mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

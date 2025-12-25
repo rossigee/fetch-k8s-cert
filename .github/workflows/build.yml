@@ -80,7 +80,6 @@ jobs:
         with:
           version: latest
           skip-cache: true
-          verify: false
 
   security:
     name: Security Scan

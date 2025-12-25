@@ -79,6 +79,7 @@ jobs:
         run: |
           curl -L https://github.com/golangci/golangci-lint/releases/download/v2.7.2/golangci-lint-2.7.2-linux-${{ matrix.arch }}.tar.gz -o golangci-lint.tar.gz
           tar -xzf golangci-lint.tar.gz
+          mv golangci-lint-*-linux-${{ matrix.arch }}/golangci-lint .
           chmod +x ./golangci-lint
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
             go test -v -race -coverprofile=coverage.out -covermode=atomic

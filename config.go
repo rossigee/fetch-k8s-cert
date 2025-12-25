@@ -70,7 +70,7 @@ func setObservabilityDefaults(obsConfig *ObservabilityConfig) {
 
 // readFile reads a file and returns its content
 func readFile(filePath string) ([]byte, error) {
-	file, err := os.Open(filePath)
+	file, err := os.Open(filePath) // #nosec G304
 	if err != nil {
 		return nil, err
 	}

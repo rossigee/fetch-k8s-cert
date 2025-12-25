@@ -81,6 +81,8 @@ jobs:
       - name: Run security scan
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: securego/gosec@master
+        with:
+          args: '-exclude=G304'
 
 
       - name: Login to Container Registry

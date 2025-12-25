@@ -68,9 +68,7 @@ jobs:
             network=host
 
       - name: Build package
-        run:
-          make
-          make deb
+        run: make deb
 
       - name: Run tests with coverage
         run:

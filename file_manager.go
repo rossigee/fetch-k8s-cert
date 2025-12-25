@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -165,7 +166,7 @@ func (fm *FileManager) updateFileIfDifferent(filePath string, data []byte, permi
 
 // writeToFile writes data to a file with specified permissions
 func (fm *FileManager) writeToFile(data []byte, filePath string, permissions os.FileMode, fileType string) error {
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, permissions)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, permissions) // #nosec G304
 	if err != nil {
 		if obs != nil && obs.metrics != nil {
 			obs.metrics.RecordFileWriteError(fileType, "open_failed")

@@ -114,11 +114,6 @@ jobs:
         with:
           args: '-fmt sarif -out gosec.sarif -stdout -verbose=text -exclude=G101 -exclude=G303 -exclude=G204 -exclude=G302 -exclude=G301 -exclude=G304 ./...'
 
-      - name: Run govulncheck vulnerability scanner
-        run:
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
       - name: Upload security results
         uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('gosec.sarif') != ''

@@ -23,9 +23,9 @@ type K8sClient struct {
 func NewK8sClient(config Config) (*K8sClient, error) {
 	var tlsConfig *tls.Config
 	if config.SkipTLSVerification {
-		tlsConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402
+		tlsConfig = &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12} // #nosec G402
 	} else {
-		tlsConfig = &tls.Config{}
+		tlsConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 
 	tr := &http.Transport{

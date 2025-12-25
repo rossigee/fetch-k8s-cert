@@ -104,7 +104,8 @@ func (fm *FileManager) updateFileIfDifferent(filePath string, data []byte, permi
 	}
 
 	// Read the current content of the file
-	currentData, err := readFile(filePath) // #nosec G304
+	// #nosec G304
+	currentData, err := readFile(filePath)
 	if err != nil && os.IsNotExist(err) {
 		// Handle case where local file doesn't exist
 		if obs != nil && obs.logger != nil {

@@ -26,7 +26,8 @@ type Config struct {
 
 // LoadConfigFromFile loads configuration from a YAML file
 func LoadConfigFromFile(filePath string) (*Config, error) {
-	configData, err := readFile(filePath) // #nosec G304
+	// #nosec G304
+	configData, err := readFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading config file from '%s': %w", filePath, err)
 	}
@@ -68,7 +69,8 @@ func setObservabilityDefaults(obsConfig *ObservabilityConfig) {
 
 // readFile reads a file and returns its content
 func readFile(filePath string) ([]byte, error) {
-	file, err := os.Open(filePath) // #nosec G304
+	// #nosec G304
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}

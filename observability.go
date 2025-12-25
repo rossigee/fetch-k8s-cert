@@ -130,7 +130,7 @@ func (om *ObservabilityManager) initLogger() error {
 
 	// Configure output
 	if om.config.LogToFile && om.config.LogFile != "" {
-		file, err := os.OpenFile(om.config.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(om.config.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}

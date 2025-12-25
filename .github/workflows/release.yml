@@ -82,7 +82,7 @@ jobs:
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: securego/gosec@master
       - name: Run govulncheck vulnerability scanner
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
 
 
       - name: Login to Container Registry

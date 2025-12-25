@@ -159,6 +159,11 @@ jobs:
         run:
           make build
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
       - name: Build Docker image
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         uses: docker/build-push-action@v6

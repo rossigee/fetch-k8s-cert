@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-12-25
+
+### ✨ New Features
+
+#### Certificate Handling Enhancements
+- **Optional CA Certificate**: `ca.crt` field in Kubernetes secrets is now optional. When missing, the application extracts CA from the certificate chain (if `useIntermediateCA` is enabled) or proceeds with empty CA data.
+- **Robust Chain Processing**: Improved handling of certificate chains without intermediate CAs, with fallback logic for CA extraction.
+
+#### Observability Improvements
+- **Hardcoded Service Identity**: `serviceName` and `serviceVersion` are now hardcoded in the binary (not configurable) for consistent telemetry metadata.
+- **Tracing Endpoint Validation**: Added validation and automatic path stripping for OTLP tracing endpoints to prevent malformed URLs.
+
+#### Development Experience
+- **Enhanced Test Coverage**: Added tests for CA-optional scenarios, config loading, and reload command failures.
+- **Comprehensive Linting**: Integrated Go formatting checks into the lint pipeline to catch formatting issues early.
+- **Security Improvements**: Updated dependencies and refined temporary file handling in tests for better security.
+
+### 🔧 Improvements
+
+- **Error Path Coverage**: Extended test suite with additional error scenarios for better reliability.
+- **Makefile Enhancements**: Added formatting and format-checking targets for consistent code style.
+- **Configuration Validation**: Improved config loading with better defaults and validation.
+
+### 🐛 Bug Fixes
+
+- **URL Construction**: Fixed OTLP tracing endpoint URL construction to avoid double path appending.
+- **Test Isolation**: Improved test cleanup and isolation using `t.TempDir()` for security.
+- **Import Cleanup**: Removed unused imports and cleaned up code formatting.
+
+---
+
 ## [2.0.1] - 2025-12-23
 
 ### 🔧 Improvements

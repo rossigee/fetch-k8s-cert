@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,10 +36,8 @@ type ObservabilityConfig struct {
 
 	// Tracing configuration
 	EnableTracing   bool              `yaml:"enableTracing"`   // enable OpenTelemetry tracing
-	TracingEndpoint string            `yaml:"tracingEndpoint"` // OTLP endpoint URL
+	TracingEndpoint string            `yaml:"tracingEndpoint"` // OTLP endpoint URL (may include path)
 	TracingHeaders  map[string]string `yaml:"tracingHeaders"`  // additional headers for tracing
-	ServiceName     string            `yaml:"serviceName"`     // service name for tracing
-	ServiceVersion  string            `yaml:"serviceVersion"`  // service version for tracing
 	TracingSampling float64           `yaml:"tracingSampling"` // sampling ratio (0.0 to 1.0)
 }
 
@@ -304,15 +303,8 @@ func (om *ObservabilityManager) initTracing() error {
 	ctx := context.Background()
 
 	// Configure resource
-	serviceName := om.config.ServiceName
-	if serviceName == "" {
-		serviceName = "fetch-k8s-cert"
-	}
-
-	serviceVersion := om.config.ServiceVersion
-	if serviceVersion == "" {
-		serviceVersion = version // Use the global version variable
-	}
+	serviceName := "fetch-k8s-cert"
+	serviceVersion := version // Use the global version variable
 
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
@@ -327,7 +319,13 @@ func (om *ObservabilityManager) initTracing() error {
 	// Configure exporter
 	endpoint := om.config.TracingEndpoint
 	if endpoint == "" {
-		endpoint = "http://localhost:4318/v1/traces" // Default OTLP HTTP endpoint
+		endpoint = "http://localhost:4318" // Default OTLP HTTP endpoint
+	}
+
+	// Strip /v1/traces from endpoint if present to avoid double path
+	if strings.HasSuffix(endpoint, "/v1/traces") {
+		om.logger.Warn("Tracing endpoint includes /v1/traces path; stripping it to avoid double path")
+		endpoint = strings.TrimSuffix(endpoint, "/v1/traces")
 	}
 
 	exporterOptions := []otlptracehttp.Option{
@@ -365,10 +363,8 @@ func (om *ObservabilityManager) initTracing() error {
 	om.tracer = otel.Tracer("fetch-k8s-cert")
 
 	om.logger.WithFields(logrus.Fields{
-		"endpoint":    endpoint,
-		"sampling":    sampling,
-		"serviceName": serviceName,
-		"version":     serviceVersion,
+		"endpoint": endpoint,
+		"sampling": sampling,
 	}).Info("Initialized OpenTelemetry tracing")
 
 	return nil

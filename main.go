@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	version = "2.0.0" // Set by build flags
+	version = "2.1.0" // Set by build flags
 	log     = logrus.New()
 	obs     *ObservabilityManager
 )
@@ -20,6 +20,7 @@ var (
 func main() {
 	// Define command-line flags
 	configFilePath := flag.String("f", "", "Path to the configuration file")
+	verboseFlag := flag.Bool("v", false, "Enable verbose logging (info level)")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
@@ -30,7 +31,7 @@ func main() {
 
 	if *configFilePath == "" {
 		fmt.Println("Please provide a path to the configuration file using the -f flag.")
-		fmt.Println("Usage: fetch-k8s-cert -f <config-file>")
+		fmt.Println("Usage: fetch-k8s-cert -f <config-file> [-v]")
 		os.Exit(1)
 	}
 
@@ -39,6 +40,11 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error loading configuration from file: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Override log level if verbose flag is set
+	if *verboseFlag {
+		config.Observability.LogLevel = "info"
 	}
 
 	// Initialize observability

@@ -1,3 +1,9 @@
+fetch-k8s-cert (2.1.0-1) unstable; urgency=medium
+
+  * Updated to version 2.1.0 with certificate handling improvements and observability enhancements.
+
+ -- Ross Golder <ross@golder.org>  Wed, 25 Dec 2025 12:00:00 +0000
+
 fetch-k8s-cert (2.0.1-1) unstable; urgency=medium
 
   * Updated to version 2.0.1 with Go 1.25.5 compatibility.

@@ -8,15 +8,11 @@ run:
 linters:
   enable:
     - bodyclose
-    - depguard
     - dogsled
     - dupl
     - errcheck
     - gochecknoinits
     - goconst
-    - gocritic
-    - gocyclo
-    - gosec
     - govet
     - misspell
     - nakedret

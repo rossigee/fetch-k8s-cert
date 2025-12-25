@@ -1,4 +1,4 @@
-# Example configuration for fetch-k8s-cert v2.0.0
+# Example configuration for fetch-k8s-cert v2.1.0
 
 # Kubernetes API configuration
 k8sAPIURL: https://your.cluster.address:6443
@@ -40,9 +40,7 @@ observability:
 
   # Tracing (OpenTelemetry)
   enableTracing: true               # enable distributed tracing
-  tracingEndpoint: http://jaeger:14268/api/traces  # OTLP endpoint
+  tracingEndpoint: http://localhost:4318  # OTLP endpoint (path /v1/traces added if not present)
   tracingHeaders:                   # additional headers
     Authorization: "Bearer <token>"
-  serviceName: fetch-k8s-cert       # service name for tracing
-  serviceVersion: 2.0.0             # service version
   tracingSampling: 1.0              # sampling ratio (0.0-1.0)

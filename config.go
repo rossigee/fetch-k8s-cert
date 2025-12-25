@@ -60,12 +60,7 @@ func setObservabilityDefaults(obsConfig *ObservabilityConfig) {
 	if obsConfig.MetricsAddress == "" {
 		obsConfig.MetricsAddress = "0.0.0.0"
 	}
-	if obsConfig.ServiceName == "" {
-		obsConfig.ServiceName = "fetch-k8s-cert"
-	}
-	if obsConfig.ServiceVersion == "" {
-		obsConfig.ServiceVersion = version
-	}
+
 	if obsConfig.TracingSampling <= 0 || obsConfig.TracingSampling > 1 {
 		obsConfig.TracingSampling = 1.0
 	}

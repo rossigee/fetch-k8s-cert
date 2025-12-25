@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crypto/x509"
 	"context"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -34,7 +34,7 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 	caData, foundCa := secret.Data["ca.crt"]
 	certData, foundCert := secret.Data["tls.crt"]
 	keyData, foundKey := secret.Data["tls.key"]
-	if !foundCa || !foundCert || !foundKey {
+	if !foundCert || !foundKey {
 		return nil, fmt.Errorf("TLS certificate or key not found in secret data")
 	}
 
@@ -63,17 +63,27 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 		intermediateCA, err := ExtractIntermediateCAFromCertChain(decodedCert)
 		if err != nil {
 			if obs != nil && obs.logger != nil {
-				obs.logger.WithError(err).Warn("Failed to extract intermediate CA, falling back to ca.crt")
+				obs.logger.WithError(err).Warn("Failed to extract intermediate CA")
 			}
 			if obs != nil && obs.metrics != nil {
 				obs.metrics.RecordCAExtractionError("intermediate_extraction")
-				obs.metrics.RecordCAExtraction("fallback", "success")
 			}
 
-			// Fall back to the original ca.crt
-			finalCAData, err = base64.StdEncoding.DecodeString(caData)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode CA data: %w", err)
+			// Try to fall back to the original ca.crt if available
+			if foundCa {
+				finalCAData, err = base64.StdEncoding.DecodeString(caData)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode CA data: %w", err)
+				}
+				if obs != nil && obs.metrics != nil {
+					obs.metrics.RecordCAExtraction("fallback", "success")
+				}
+			} else {
+				// No CA available
+				finalCAData = []byte{}
+				if obs != nil && obs.metrics != nil {
+					obs.metrics.RecordCAExtraction("none", "success")
+				}
 			}
 		} else {
 			finalCAData = intermediateCA
@@ -82,13 +92,21 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 			}
 		}
 	} else {
-		// Use the standard ca.crt field
-		finalCAData, err = base64.StdEncoding.DecodeString(caData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode CA data: %w", err)
-		}
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordCAExtraction("standard", "success")
+		// Use the standard ca.crt field if available
+		if foundCa {
+			finalCAData, err = base64.StdEncoding.DecodeString(caData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode CA data: %w", err)
+			}
+			if obs != nil && obs.metrics != nil {
+				obs.metrics.RecordCAExtraction("standard", "success")
+			}
+		} else {
+			// No CA available
+			finalCAData = []byte{}
+			if obs != nil && obs.metrics != nil {
+				obs.metrics.RecordCAExtraction("none", "success")
+			}
 		}
 	}
 
@@ -145,8 +163,8 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 	}
 
 	if len(certificates) < 2 {
-		err := fmt.Errorf("certificate chain must contain at least 2 certificates " +
-		"(server + issuer), found %d", len(certificates))
+		err := fmt.Errorf("certificate chain must contain at least 2 certificates "+
+			"(server + issuer), found %d", len(certificates))
 		if span != nil {
 			span.RecordError(err)
 		}

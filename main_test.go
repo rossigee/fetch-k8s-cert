@@ -16,7 +16,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -121,14 +120,30 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 	})
 }
 
-func setupTempDir() string {
-	tempDir := os.TempDir() // #nosec G303
-	testDir := filepath.Join(tempDir, "test-fetch-k8s-cert", strconv.FormatInt(time.Now().UnixNano(), 10))
-	err := os.MkdirAll(testDir, 0755)
-	if err != nil {
-		panic(fmt.Sprintf("Error creating temporary directory: %v", err))
-	}
-	return testDir
+func TestMainFunction_ReloadFailure(t *testing.T) {
+	hook := &TestHook{}
+	log.AddHook(hook)
+
+	testCA := []byte("base64-encoded-ca\n")
+	encodedCA := base64.StdEncoding.EncodeToString(testCA)
+	testCert := []byte("base64-encoded-cert\n")
+	encodedCert := base64.StdEncoding.EncodeToString(testCert)
+	testKey := []byte("base64-encoded-key\n")
+	encodedKey := base64.StdEncoding.EncodeToString(testKey)
+	requestBody := fmt.Sprintf(`{"data": {"ca.crt": "%s", "tls.crt": "%s", "tls.key": "%s"}}`, encodedCA, encodedCert, encodedKey)
+
+	runTestWithConfig_CustomReload(t, requestBody, "false", func(config Config) {
+		ctx := context.Background()
+		err := run(ctx, config)
+		if err == nil {
+			t.Errorf("Expected run() to fail due to reload command failure, but it succeeded")
+		}
+
+		// Check if the expected error message is logged or returned
+		if !containsLogMessage(hook.Messages, "failed to trigger reload") && !strings.Contains(err.Error(), "failed to trigger reload") {
+			t.Errorf("Expected error message not found in logs or error: %v", err)
+		}
+	})
 }
 
 func createMockServer(statusCode int, responseBody string) *httptest.Server {
@@ -149,8 +164,11 @@ func containsLogMessage(messages []string, targetMessage string) bool {
 }
 
 func runTestWithConfig(t *testing.T, requestBody string, testFunc func(config Config)) {
-	tempDir := setupTempDir()
-	defer func() { _ = os.RemoveAll(tempDir) }()
+	runTestWithConfig_CustomReload(t, requestBody, "echo test-reload", testFunc)
+}
+
+func runTestWithConfig_CustomReload(t *testing.T, requestBody string, reloadCmd string, testFunc func(config Config)) {
+	tempDir := t.TempDir()
 
 	mockServer := createMockServer(http.StatusOK, requestBody)
 	defer mockServer.Close()
@@ -167,7 +185,7 @@ func runTestWithConfig(t *testing.T, requestBody string, testFunc func(config Co
 		LocalCAFile:   caFilePath,
 		LocalCertFile: certFilePath,
 		LocalKeyFile:  keyFilePath,
-		ReloadCommand: "echo test-reload",
+		ReloadCommand: reloadCmd,
 	}
 
 	testFunc(testConfig)
@@ -596,6 +614,45 @@ func TestExtractTLSBundle_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestExtractTLSBundle_NoCA(t *testing.T) {
+	// Test when no ca.crt is present in secret
+	certChain, err := createTestCertificateChain()
+	if err != nil {
+		t.Fatalf("Failed to create test certificate chain: %v", err)
+	}
+
+	encodedCertChain := base64.StdEncoding.EncodeToString(certChain)
+	encodedKey := base64.StdEncoding.EncodeToString([]byte("mock-private-key"))
+
+	// Secret without ca.crt
+	secretData := fmt.Sprintf(`{"data": {"tls.crt": "%s", "tls.key": "%s"}}`,
+		encodedCertChain, encodedKey)
+
+	// Test with useIntermediateCA enabled (should extract from chain)
+	config := Config{UseIntermediateCA: true}
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	if err != nil {
+		t.Fatalf("Failed to extract TLS bundle: %v", err)
+	}
+
+	// Should have intermediate CA from chain
+	if len(bundle.CAData) == 0 {
+		t.Error("Expected CA data from certificate chain, got empty")
+	}
+
+	// Test with useIntermediateCA disabled (should set empty CA)
+	config = Config{UseIntermediateCA: false}
+	bundle, err = ExtractTLSBundleFromSecret([]byte(secretData), config)
+	if err != nil {
+		t.Fatalf("Failed to extract TLS bundle: %v", err)
+	}
+
+	// Should have empty CA data
+	if len(bundle.CAData) != 0 {
+		t.Error("Expected empty CA data, got data")
+	}
+}
+
 func TestExtractTLSBundle_IntermediateCAFallback(t *testing.T) {
 	// Test fallback to ca.crt when intermediate extraction fails
 	invalidCertChain := []byte("invalid certificate data")
@@ -650,5 +707,50 @@ func BenchmarkParseCertificateChain(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Benchmark failed: %v", err)
 		}
+	}
+}
+
+// Additional test for config loading
+
+func TestLoadConfigFromFile(t *testing.T) {
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "test-config.yaml")
+
+	configContent := `
+namespace: test-namespace
+secretName: test-secret
+localCAFile: /tmp/ca.pem
+localCertFile: /tmp/cert.pem
+localKeyFile: /tmp/key.pem
+observability:
+  enableMetrics: true
+  logLevel: debug
+  tracingEndpoint: http://localhost:4318
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	config, err := LoadConfigFromFile(configFile)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if config.Namespace != "test-namespace" {
+		t.Errorf("Expected namespace 'test-namespace', got '%s'", config.Namespace)
+	}
+
+	if !config.Observability.EnableMetrics {
+		t.Error("Expected metrics enabled")
+	}
+
+	if config.Observability.LogLevel != "debug" {
+		t.Errorf("Expected log level 'debug', got '%s'", config.Observability.LogLevel)
+	}
+
+	if config.Observability.TracingEndpoint != "http://localhost:4318" {
+		t.Errorf("Expected tracing endpoint 'http://localhost:4318', got '%s'", config.Observability.TracingEndpoint)
 	}
 }

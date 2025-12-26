@@ -339,7 +339,16 @@ The project uses GitHub Actions for:
 - **Container Images**: Multi-arch Docker images
 - **Release Automation**: Semantic versioning with automated releases
 
-Build status: ![Build](https://github.com/rossigee/fetch-k8s-cert/workflows/Build/badge.svg)
+Build status: ![Build](https://github.com/rossigee/fetch-k8s-cert/workflows/CI/badge.svg)
+
+### Releasing
+
+To create a new release:
+
+1. Update version references: `./release.sh <new-version>`
+2. Review and edit CHANGELOG.md for release notes
+3. Commit, tag, and push: `git add . && git commit -m "Release v<new-version>" && git tag v<new-version> && git push origin master && git push origin v<new-version>`
+4. GitHub Actions will build and publish the release automatically
 
 ### Contributing
 

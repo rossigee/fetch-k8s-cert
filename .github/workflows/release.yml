@@ -138,10 +138,10 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           LDFLAGS="-w -s -X main.version=$VERSION -X main.commit=$(git rev-parse --short HEAD)"
 
-          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-linux-amd64 main.go
-          GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-linux-arm64 main.go
-          GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-amd64 main.go
-          GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-arm64 main.go
+          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-linux-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-arm64 .
 
           cd dist/binaries && sha256sum * > checksums.txt
 

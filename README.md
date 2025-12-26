@@ -1,4 +1,4 @@
-# Fetch K8s Certificate v2.0.1
+# Fetch K8s Certificate v2.1.6
 
 **Enterprise-grade certificate management tool with comprehensive observability.**
 
@@ -146,7 +146,7 @@ Typically, you would be deploying this either as a 'systemd' service or as a Doc
 1. **Install the Package**
    ```bash
    sudo apt update
-   sudo apt install ./fetch-k8s-cert_1.0.0_amd64.deb
+   sudo apt install ./fetch-k8s-cert_2.1.6_amd64.deb
    ```
 
 2. **Configure the Tool**
@@ -177,7 +177,7 @@ This setup demonstrates using `fetch-k8s-cert` to renew certificates for an Ngin
    ```yaml
    services:
      cert-fetcher:
-       image: fetch-k8s-cert:latest
+       image: ghcr.io/rossigee/fetch-k8s-cert:latest
        volumes:
          - ./certs:/etc/ssl/certs
          - ./config:/etc/fetch-k8s-cert

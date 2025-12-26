@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	version = "2.1.0" // Set by build flags
+	version = "2.1.6" // Set by build flags
 	log     = logrus.New()
 	obs     *ObservabilityManager
 )

@@ -75,6 +75,11 @@ jobs:
       - name: Build package
         run: make deb
 
+      - name: Prepare release assets
+        run: |
+          mkdir -p dist/packages
+          cp ../*.deb ../*.ddeb dist/packages/ 2>/dev/null || true
+
       - name: Run tests with coverage
         run: |
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
@@ -141,17 +146,16 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-linux-amd64 .
           GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-linux-arm64 .
           GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-amd64 .
-          GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-arm64 .
+           GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/binaries/fetch-k8s-cert-darwin-arm64 .
 
-          cd dist/binaries && sha256sum * > checksums.txt
+           cd dist/binaries && sha256sum * > checksums.txt
 
-       - name: Create Release
-         uses: softprops/action-gh-release@v2
-         with:
-           tag_name: ${{ github.ref_name }}
-           name: Release ${{ github.ref_name }}
-           body_path: CHANGELOG.md
-           files: |
-             dist/binaries/*
-             ../*.deb
-             ../*.ddeb
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          files: |
+            dist/binaries/*
+            dist/packages/*

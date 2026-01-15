@@ -145,11 +145,13 @@ jobs:
 
           cd dist/binaries && sha256sum * > checksums.txt
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body_path: CHANGELOG.md
-          files: |
-            dist/binaries/*
+       - name: Create Release
+         uses: softprops/action-gh-release@v2
+         with:
+           tag_name: ${{ github.ref_name }}
+           name: Release ${{ github.ref_name }}
+           body_path: CHANGELOG.md
+           files: |
+             dist/binaries/*
+             ../*.deb
+             ../*.ddeb

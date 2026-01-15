@@ -150,7 +150,7 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 	var span trace.Span
 	if obs != nil && obs.tracer != nil {
-		_, span = obs.tracer.Start(context.TODO(), "certificate.extract_intermediate_ca")
+		_, span = obs.tracer.Start(context.Background(), "certificate.extract_intermediate_ca")
 		defer span.End()
 	}
 

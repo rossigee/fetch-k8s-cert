@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] - 2026-01-16
+
+### 🔧 Improvements
+
+- **Dependency Updates**: Updated multiple dependencies for security and performance improvements including logrus, prometheus, grpc-gateway, and golang.org/x packages
+- **Code Quality**: Fixed code formatting and indentation issues
+
+---
+
 ## [2.1.5] - 2025-12-26
 
 ### 🔧 Improvements

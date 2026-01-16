@@ -30,7 +30,7 @@ fmt-check:
 
 .PHONY: deb
 deb:
-	dpkg-buildpackage
+	dpkg-buildpackage -b --no-sign
 
 .PHONY: clean
 clean:

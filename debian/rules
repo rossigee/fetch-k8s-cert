@@ -5,3 +5,10 @@
 
 # For some reason 'dwz' results in obscure error and failure
 override_dh_dwz:
+
+# Build .deb files directly into dist/packages directory
+override_dh_builddeb:
+	mkdir -p ../dist/packages
+	dh_builddeb --destdir=../dist/packages
+	# Move debug symbols package too
+	mv ../*.ddeb ../dist/packages/ 2>/dev/null || true

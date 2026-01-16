@@ -3,3 +3,16 @@ config.yaml
 debian/fetch-k8s-cert.substvars
 debian/files
 build
+
+# Log files
+*.log
+*.debhelper.log
+
+# Build artifacts
+*.deb
+*.ddeb
+*.buildinfo
+*.changes
+
+# dist directory (created during builds)
+dist/

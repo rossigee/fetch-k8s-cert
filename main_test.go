@@ -47,7 +47,11 @@ func TestMainFunction_Success(t *testing.T) {
 
 	runTestWithConfig(t, requestBody, func(config Config) {
 		ctx := context.Background()
-		err := run(ctx, config)
+		// Create minimal logger and obs for testing
+		logger := logrus.New()
+		logger.SetLevel(logrus.ErrorLevel) // Reduce noise
+		obs, _ := NewObservabilityManager(config.Observability)
+		err := run(ctx, config, logger, obs)
 		if err != nil {
 			t.Fatalf("run() failed: %v", err)
 		}
@@ -69,8 +73,9 @@ func TestMainFunction_Success(t *testing.T) {
 }
 
 func TestMainFunction_Failure(t *testing.T) {
+	logger := logrus.New()
 	hook := &TestHook{}
-	log.AddHook(hook)
+	logger.AddHook(hook)
 
 	testCA := []byte("base64-encoded-ca\n")
 	testCert := []byte("base64-encoded-cert\n")
@@ -79,7 +84,8 @@ func TestMainFunction_Failure(t *testing.T) {
 
 	runTestWithConfig(t, requestBody, func(config Config) {
 		ctx := context.Background()
-		err := run(ctx, config)
+		obs, _ := NewObservabilityManager(config.Observability)
+		err := run(ctx, config, logger, obs)
 		if err == nil {
 			t.Errorf("Expected run() to fail, but it succeeded")
 		}
@@ -92,8 +98,9 @@ func TestMainFunction_Failure(t *testing.T) {
 }
 
 func TestMainFunction_InvalidConfig(t *testing.T) {
+	logger := logrus.New()
 	hook := &TestHook{}
-	log.AddHook(hook)
+	logger.AddHook(hook)
 
 	testCA := []byte("base64-encoded-ca\n")
 	encodedCA := base64.StdEncoding.EncodeToString(testCA)
@@ -108,7 +115,8 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 		config.LocalCAFile = "/etc/hosts"
 
 		ctx := context.Background()
-		err := run(ctx, config)
+		obs, _ := NewObservabilityManager(config.Observability)
+		err := run(ctx, config, logger, obs)
 		if err == nil {
 			t.Errorf("Expected run() to fail, but it succeeded")
 		}
@@ -121,8 +129,9 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 }
 
 func TestMainFunction_ReloadFailure(t *testing.T) {
+	logger := logrus.New()
 	hook := &TestHook{}
-	log.AddHook(hook)
+	logger.AddHook(hook)
 
 	testCA := []byte("base64-encoded-ca\n")
 	encodedCA := base64.StdEncoding.EncodeToString(testCA)
@@ -134,7 +143,8 @@ func TestMainFunction_ReloadFailure(t *testing.T) {
 
 	runTestWithConfig_CustomReload(t, requestBody, "false", func(config Config) {
 		ctx := context.Background()
-		err := run(ctx, config)
+		obs, _ := NewObservabilityManager(config.Observability)
+		err := run(ctx, config, logger, obs)
 		if err == nil {
 			t.Errorf("Expected run() to fail due to reload command failure, but it succeeded")
 		}
@@ -314,7 +324,7 @@ func TestExtractIntermediateCAFromCertChain_Success(t *testing.T) {
 		t.Fatalf("Failed to create test certificate chain: %v", err)
 	}
 
-	intermediatePEM, err := ExtractIntermediateCAFromCertChain(certChain)
+	intermediatePEM, err := ExtractIntermediateCAFromCertChain(certChain, nil)
 	if err != nil {
 		t.Fatalf("Failed to extract intermediate CA: %v", err)
 	}
@@ -353,7 +363,7 @@ func TestExtractIntermediateCAFromCertChain_InsufficientCerts(t *testing.T) {
 
 	singleCertPEM, _ := generateCertificate(rootTemplate, rootTemplate, &rootKey.PublicKey, rootKey)
 
-	_, err := ExtractIntermediateCAFromCertChain(singleCertPEM)
+	_, err := ExtractIntermediateCAFromCertChain(singleCertPEM, nil)
 	if err == nil {
 		t.Error("Expected error for insufficient certificates, got nil")
 	}
@@ -367,7 +377,7 @@ func TestExtractIntermediateCAFromCertChain_InsufficientCerts(t *testing.T) {
 func TestExtractIntermediateCAFromCertChain_InvalidPEM(t *testing.T) {
 	invalidPEM := []byte("invalid PEM data")
 
-	_, err := ExtractIntermediateCAFromCertChain(invalidPEM)
+	_, err := ExtractIntermediateCAFromCertChain(invalidPEM, nil)
 	if err == nil {
 		t.Error("Expected error for invalid PEM, got nil")
 	}
@@ -389,7 +399,7 @@ func TestExtractTLSBundleWithIntermediateCA(t *testing.T) {
 
 	// Test with useIntermediateCA enabled
 	config := Config{UseIntermediateCA: true}
-	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
@@ -427,7 +437,7 @@ func TestExtractTLSBundleWithoutIntermediateCA(t *testing.T) {
 
 	// Test with useIntermediateCA disabled (default)
 	config := Config{UseIntermediateCA: false}
-	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
@@ -518,7 +528,7 @@ MALFORMED_CERTIFICATE_DATA
 ALSO_MALFORMED
 -----END CERTIFICATE-----`)
 
-	_, err := ExtractIntermediateCAFromCertChain(serverPEM)
+	_, err := ExtractIntermediateCAFromCertChain(serverPEM, nil)
 	if err == nil {
 		t.Error("Expected error for malformed certificate, got nil")
 	}
@@ -565,7 +575,7 @@ func TestExtractIntermediateCA_SelfSignedCertificate(t *testing.T) {
 	chainBuffer.Write(certPEM)
 	chainBuffer.Write(otherCertPEM)
 
-	_, err := ExtractIntermediateCAFromCertChain(chainBuffer.Bytes())
+	_, err := ExtractIntermediateCAFromCertChain(chainBuffer.Bytes(), nil)
 	if err == nil {
 		t.Error("Expected error for self-signed certificate with no valid issuer, got nil")
 	}
@@ -581,7 +591,7 @@ func TestExtractTLSBundle_MissingSecretFields(t *testing.T) {
 	secretData := `{"data": {"ca.crt": "Y2EtZGF0YQ==", "tls.key": "a2V5LWRhdGE="}}`
 
 	config := Config{UseIntermediateCA: false}
-	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err == nil {
 		t.Error("Expected error for missing tls.crt field, got nil")
 	}
@@ -597,7 +607,7 @@ func TestExtractTLSBundle_InvalidBase64(t *testing.T) {
 	secretData := `{"data": {"ca.crt": "invalid-base64!", "tls.crt": "Y2VydC1kYXRh", "tls.key": "a2V5LWRhdGE="}}`
 
 	config := Config{UseIntermediateCA: false}
-	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err == nil {
 		t.Error("Expected error for invalid base64 data, got nil")
 	}
@@ -608,7 +618,7 @@ func TestExtractTLSBundle_InvalidJSON(t *testing.T) {
 	secretData := `{"data": {malformed json`
 
 	config := Config{UseIntermediateCA: false}
-	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	_, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err == nil {
 		t.Error("Expected error for invalid JSON, got nil")
 	}
@@ -630,7 +640,7 @@ func TestExtractTLSBundle_NoCA(t *testing.T) {
 
 	// Test with useIntermediateCA enabled (should extract from chain)
 	config := Config{UseIntermediateCA: true}
-	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
@@ -642,7 +652,7 @@ func TestExtractTLSBundle_NoCA(t *testing.T) {
 
 	// Test with useIntermediateCA disabled (should set empty CA)
 	config = Config{UseIntermediateCA: false}
-	bundle, err = ExtractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err = ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to extract TLS bundle: %v", err)
 	}
@@ -667,7 +677,7 @@ func TestExtractTLSBundle_IntermediateCAFallback(t *testing.T) {
 
 	// Test with useIntermediateCA enabled but fallback should occur
 	config := Config{UseIntermediateCA: true}
-	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config)
+	bundle, err := ExtractTLSBundleFromSecret([]byte(secretData), config, nil, nil)
 	if err != nil {
 		t.Fatalf("Expected successful fallback, got error: %v", err)
 	}
@@ -688,7 +698,7 @@ func BenchmarkExtractIntermediateCA(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ExtractIntermediateCAFromCertChain(certChain)
+		_, err := ExtractIntermediateCAFromCertChain(certChain, nil)
 		if err != nil {
 			b.Fatalf("Benchmark failed: %v", err)
 		}
@@ -717,6 +727,7 @@ func TestLoadConfigFromFile(t *testing.T) {
 	configFile := filepath.Join(tempDir, "test-config.yaml")
 
 	configContent := `
+k8sAPIURL: https://kubernetes.example.com:6443
 namespace: test-namespace
 secretName: test-secret
 localCAFile: /tmp/ca.pem

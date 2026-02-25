@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -9,8 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/sirupsen/logrus"
 )
 
 // TLSBundle represents a complete TLS certificate bundle
@@ -21,7 +19,7 @@ type TLSBundle struct {
 }
 
 // ExtractTLSBundleFromSecret extracts TLS certificate data from a Kubernetes secret
-func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, error) {
+func ExtractTLSBundleFromSecret(secretData []byte, config Config, logger *logrus.Logger, metrics *Metrics) (*TLSBundle, error) {
 	var secret struct {
 		Data map[string]string `json:"data"`
 	}
@@ -42,31 +40,37 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode certificate data: %w", err)
 	}
+	if len(decodedCert) > 10*1024*1024 { // 10MB limit
+		return nil, fmt.Errorf("certificate data too large: %d bytes", len(decodedCert))
+	}
 
 	decodedKey, err := base64.StdEncoding.DecodeString(keyData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode key data: %w", err)
+	}
+	if len(decodedKey) > 10*1024*1024 { // 10MB limit
+		return nil, fmt.Errorf("key data too large: %d bytes", len(decodedKey))
 	}
 
 	var finalCAData []byte
 
 	// If useIntermediateCA is enabled, extract the intermediate CA from the certificate chain
 	if config.UseIntermediateCA {
-		if obs != nil && obs.logger != nil {
-			obs.logger.Info("Extracting intermediate CA from certificate chain")
+		if logger != nil {
+			logger.Info("Extracting intermediate CA from certificate chain")
 		}
 
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordCAExtraction("intermediate", "attempt")
+		if metrics != nil {
+			metrics.RecordCAExtraction("intermediate", "attempt")
 		}
 
-		intermediateCA, err := ExtractIntermediateCAFromCertChain(decodedCert)
+		intermediateCA, err := ExtractIntermediateCAFromCertChain(decodedCert, logger)
 		if err != nil {
-			if obs != nil && obs.logger != nil {
-				obs.logger.WithError(err).Warn("Failed to extract intermediate CA")
+			if logger != nil {
+				logger.WithError(err).Warn("Failed to extract intermediate CA")
 			}
-			if obs != nil && obs.metrics != nil {
-				obs.metrics.RecordCAExtractionError("intermediate_extraction")
+			if metrics != nil {
+				metrics.RecordCAExtractionError("intermediate_extraction")
 			}
 
 			// Try to fall back to the original ca.crt if available
@@ -75,20 +79,23 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 				if err != nil {
 					return nil, fmt.Errorf("failed to decode CA data: %w", err)
 				}
-				if obs != nil && obs.metrics != nil {
-					obs.metrics.RecordCAExtraction("fallback", "success")
+				if len(finalCAData) > 10*1024*1024 { // 10MB limit
+					return nil, fmt.Errorf("CA data too large: %d bytes", len(finalCAData))
+				}
+				if metrics != nil {
+					metrics.RecordCAExtraction("fallback", "success")
 				}
 			} else {
 				// No CA available
 				finalCAData = []byte{}
-				if obs != nil && obs.metrics != nil {
-					obs.metrics.RecordCAExtraction("none", "success")
+				if metrics != nil {
+					metrics.RecordCAExtraction("none", "success")
 				}
 			}
 		} else {
 			finalCAData = intermediateCA
-			if obs != nil && obs.metrics != nil {
-				obs.metrics.RecordCAExtraction("intermediate", "success")
+			if metrics != nil {
+				metrics.RecordCAExtraction("intermediate", "success")
 			}
 		}
 	} else {
@@ -98,14 +105,17 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode CA data: %w", err)
 			}
-			if obs != nil && obs.metrics != nil {
-				obs.metrics.RecordCAExtraction("standard", "success")
+			if len(finalCAData) > 10*1024*1024 { // 10MB limit
+				return nil, fmt.Errorf("CA data too large: %d bytes", len(finalCAData))
+			}
+			if metrics != nil {
+				metrics.RecordCAExtraction("standard", "success")
 			}
 		} else {
 			// No CA available
 			finalCAData = []byte{}
-			if obs != nil && obs.metrics != nil {
-				obs.metrics.RecordCAExtraction("none", "success")
+			if metrics != nil {
+				metrics.RecordCAExtraction("none", "success")
 			}
 		}
 	}
@@ -117,7 +127,7 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 	}
 
 	// Extract certificate information for metrics
-	if obs != nil && obs.metrics != nil {
+	if metrics != nil {
 		if certInfo, err := parseCertificateInfo(decodedCert); err == nil {
 			namespace := config.Namespace
 			secret := config.SecretName
@@ -126,11 +136,11 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 			age := now.Sub(certInfo.NotBefore)
 			timeToExpiry := certInfo.NotAfter.Sub(now)
 
-			obs.metrics.SetCertificateAge(namespace, secret, age)
-			obs.metrics.SetCertificateExpiry(namespace, secret, timeToExpiry)
+			metrics.SetCertificateAge(namespace, secret, age)
+			metrics.SetCertificateExpiry(namespace, secret, timeToExpiry)
 
-			if obs.logger != nil {
-				obs.logger.WithFields(map[string]interface{}{
+			if logger != nil {
+				logger.WithFields(map[string]interface{}{
 					"subject":         certInfo.Subject.CommonName,
 					"issuer":          certInfo.Issuer.CommonName,
 					"not_before":      certInfo.NotBefore,
@@ -147,52 +157,36 @@ func ExtractTLSBundleFromSecret(secretData []byte, config Config) (*TLSBundle, e
 
 // ExtractIntermediateCAFromCertChain extracts the intermediate CA certificate
 // that directly issued the server certificate from a certificate chain.
-func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
-	var span trace.Span
-	if obs != nil && obs.tracer != nil {
-		_, span = obs.tracer.Start(context.Background(), "certificate.extract_intermediate_ca")
-		defer span.End()
-	}
+func ExtractIntermediateCAFromCertChain(certChainPEM []byte, logger *logrus.Logger) ([]byte, error) {
+	// Note: We don't have access to tracer here anymore since we removed global obs
+	// Tracing would need to be passed as a parameter if needed
 
 	certificates, err := parseCertificateChain(certChainPEM)
 	if err != nil {
-		if span != nil {
-			span.RecordError(err)
-		}
 		return nil, err
 	}
 
 	if len(certificates) < 2 {
 		err := fmt.Errorf("certificate chain must contain at least 2 certificates "+
 			"(server + issuer), found %d", len(certificates))
-		if span != nil {
-			span.RecordError(err)
-		}
 		return nil, err
 	}
 
 	// The server certificate is typically the first one
 	serverCert := certificates[0]
-	if obs != nil && obs.logger != nil {
-		obs.logger.WithField("subject", serverCert.Subject.CommonName).Info("Server certificate subject")
+	if logger != nil {
+		logger.WithField("subject", serverCert.Subject.CommonName).Info("Server certificate subject")
 	}
 
 	// Find the certificate that issued the server certificate
 	for i, cert := range certificates[1:] {
 		if err := serverCert.CheckSignatureFrom(cert); err == nil {
 			// This is the direct issuer (intermediate CA)
-			if obs != nil && obs.logger != nil {
-				obs.logger.WithFields(map[string]interface{}{
+			if logger != nil {
+				logger.WithFields(map[string]interface{}{
 					"position": i + 1,
 					"subject":  cert.Subject.CommonName,
 				}).Info("Found intermediate CA")
-			}
-
-			if span != nil {
-				span.SetAttributes(
-					attribute.String("intermediate_ca_subject", cert.Subject.CommonName),
-					attribute.Int("chain_position", i+1),
-				)
 			}
 
 			return certificateToPEM(cert)
@@ -200,9 +194,6 @@ func ExtractIntermediateCAFromCertChain(certChainPEM []byte) ([]byte, error) {
 	}
 
 	err = fmt.Errorf("could not find intermediate CA that issued the server certificate")
-	if span != nil {
-		span.RecordError(err)
-	}
 	return nil, err
 }
 

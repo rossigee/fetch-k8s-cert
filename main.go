@@ -12,9 +12,7 @@ import (
 )
 
 var (
-	version = "2.1.6" // Set by build flags
-	log     = logrus.New()
-	obs     *ObservabilityManager
+	version = "dev" // Set by build flags
 )
 
 func main() {
@@ -48,14 +46,14 @@ func main() {
 	}
 
 	// Initialize observability
-	obs, err = NewObservabilityManager(config.Observability)
+	obs, err := NewObservabilityManager(config.Observability)
 	if err != nil {
 		fmt.Printf("Error initializing observability: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Replace global logger with observability logger
-	log = obs.Logger()
+	// Get logger from observability
+	log := obs.Logger()
 
 	// Set up graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -72,7 +70,7 @@ func main() {
 	}()
 
 	// Run the application
-	if err := run(ctx, *config); err != nil {
+	if err := run(ctx, *config, log, obs); err != nil {
 		log.WithError(err).Error("Application failed")
 		os.Exit(1)
 	}
@@ -85,7 +83,7 @@ func main() {
 }
 
 // run executes the main application logic
-func run(ctx context.Context, config Config) error {
+func run(ctx context.Context, config Config, log *logrus.Logger, obs *ObservabilityManager) error {
 	log.WithFields(logrus.Fields{
 		"version":             version,
 		"namespace":           config.Namespace,
@@ -95,13 +93,13 @@ func run(ctx context.Context, config Config) error {
 	}).Info("Starting fetch-k8s-cert")
 
 	// Create Kubernetes client
-	k8sClient, err := NewK8sClient(config)
+	k8sClient, err := NewK8sClient(config, log, obs.Metrics())
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
 	// Create file manager
-	fileManager := NewFileManager(config)
+	fileManager := NewFileManager(config, log, obs.Metrics())
 
 	// Fetch TLS bundle from Kubernetes
 	log.Info("Fetching TLS certificate bundle from Kubernetes")

@@ -9,18 +9,21 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // K8sClient handles communication with the Kubernetes API
 type K8sClient struct {
-	client *http.Client
-	config Config
+	client  *http.Client
+	config  Config
+	logger  *logrus.Logger
+	metrics *Metrics
 }
 
 // NewK8sClient creates a new Kubernetes API client
-func NewK8sClient(config Config) (*K8sClient, error) {
+func NewK8sClient(config Config, logger *logrus.Logger, metrics *Metrics) (*K8sClient, error) {
 	var tlsConfig *tls.Config
 	if config.SkipTLSVerification {
 		tlsConfig = &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12} // #nosec G402
@@ -43,29 +46,29 @@ func NewK8sClient(config Config) (*K8sClient, error) {
 		tr.TLSClientConfig.RootCAs = caCertPool
 	}
 
+	timeout := 30 * time.Second // default
+	if config.HTTPClientTimeout > 0 {
+		timeout = time.Duration(config.HTTPClientTimeout) * time.Second
+	}
+
 	client := &http.Client{
 		Transport: tr,
-		Timeout:   30 * time.Second,
+		Timeout:   timeout,
 	}
 
 	return &K8sClient{
-		client: client,
-		config: config,
+		client:  client,
+		config:  config,
+		logger:  logger,
+		metrics: metrics,
 	}, nil
 }
 
 // GetTLSBundle fetches the TLS certificate bundle from Kubernetes
 func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
+	// Note: We removed global obs, so tracing is disabled for now
+	// If tracing is needed, it should be passed as a parameter
 	var span trace.Span
-	if obs != nil && obs.tracer != nil {
-		ctx, span = obs.tracer.Start(ctx, "k8s.get_tls_bundle",
-			trace.WithAttributes(
-				attribute.String("namespace", k.config.Namespace),
-				attribute.String("secret", k.config.SecretName),
-			),
-		)
-		defer span.End()
-	}
 
 	start := time.Now()
 
@@ -74,8 +77,8 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "request_creation")
+		if k.metrics != nil {
+			k.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "request_creation")
 		}
 		if span != nil {
 			span.RecordError(err)
@@ -85,10 +88,35 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", k.config.Token))
 
-	resp, err := k.client.Do(req)
+	// Retry logic for transient failures
+	var resp *http.Response
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, err = k.client.Do(req)
+		if err == nil && resp.StatusCode < 500 {
+			break // Success or client error, don't retry
+		}
+		if attempt < maxRetries {
+			if resp != nil {
+				_ = resp.Body.Close() // Ignore close error during retry
+			}
+			statusCode := 0
+			if resp != nil {
+				statusCode = resp.StatusCode
+			}
+			if k.logger != nil {
+				k.logger.WithFields(logrus.Fields{
+					"attempt": attempt,
+					"error":   err,
+					"status":  statusCode,
+				}).Warn("Request failed, retrying")
+			}
+			time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
+		}
+	}
 	if err != nil {
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "network")
+		if k.metrics != nil {
+			k.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "network")
 		}
 		if span != nil {
 			span.RecordError(err)
@@ -108,8 +136,8 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 			errorType = "not_found"
 		}
 
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, errorType)
+		if k.metrics != nil {
+			k.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, errorType)
 		}
 
 		err := fmt.Errorf("unexpected response status: %s", resp.Status)
@@ -121,8 +149,8 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 
 	secretData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "response_read")
+		if k.metrics != nil {
+			k.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "response_read")
 		}
 		if span != nil {
 			span.RecordError(err)
@@ -130,10 +158,10 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	tlsBundle, err := ExtractTLSBundleFromSecret(secretData, k.config)
+	tlsBundle, err := ExtractTLSBundleFromSecret(secretData, k.config, k.logger, k.metrics)
 	if err != nil {
-		if obs != nil && obs.metrics != nil {
-			obs.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "bundle_extraction")
+		if k.metrics != nil {
+			k.metrics.RecordFetchError(k.config.Namespace, k.config.SecretName, "bundle_extraction")
 		}
 		if span != nil {
 			span.RecordError(err)
@@ -144,9 +172,9 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 	duration := time.Since(start)
 
 	// Record successful metrics
-	if obs != nil && obs.metrics != nil {
-		obs.metrics.RecordFetchAttempt(k.config.Namespace, k.config.SecretName, "success")
-		obs.metrics.RecordFetchDuration(k.config.Namespace, k.config.SecretName, "success", duration)
+	if k.metrics != nil {
+		k.metrics.RecordFetchAttempt(k.config.Namespace, k.config.SecretName, "success")
+		k.metrics.RecordFetchDuration(k.config.Namespace, k.config.SecretName, "success", duration)
 	}
 
 	if span != nil {
@@ -156,8 +184,8 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		)
 	}
 
-	if obs != nil && obs.logger != nil {
-		obs.logger.WithFields(map[string]interface{}{
+	if k.logger != nil {
+		k.logger.WithFields(map[string]interface{}{
 			"namespace": k.config.Namespace,
 			"secret":    k.config.SecretName,
 			"duration":  duration,

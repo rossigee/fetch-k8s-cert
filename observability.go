@@ -281,6 +281,9 @@ func (om *ObservabilityManager) startMetricsServer() error {
 	om.metricsServer = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", address, port),
 		Handler:           mux,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -331,7 +334,7 @@ func (om *ObservabilityManager) initTracing() error {
 
 	exporterOptions := []otlptracehttp.Option{
 		otlptracehttp.WithEndpoint(endpoint),
-		otlptracehttp.WithInsecure(), // Use HTTPS in production
+		// Default to secure HTTPS; use WithInsecure() explicitly if needed
 	}
 
 	// Add custom headers if provided

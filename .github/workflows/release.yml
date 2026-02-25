@@ -11,7 +11,7 @@ env:
    APP_NAME: 'fetch-k8s-cert'
    MAINTAINER: 'rossigee'
    DESC: 'fetch-k8s-cert retrieves a X509 TLS secret from a K8S cluster API endpoint.'
-   GO_VERSION: '1.26.0'
+   GO_VERSION: '1.25.7'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 

@@ -288,12 +288,10 @@ jobs:
 
       - name: Install WiX Toolset
         run: |
-          dotnet tool install --global wix
+          dotnet tool install --global wix --version 6.0.0
           wix --version
 
       - name: Build MSI
-        env:
-          WIX_OSMF_AGREEMENT: "1"
         run: |
           mkdir -p msi-output
           $VERSION = "${{ github.ref_name }}" -replace '^v', ''

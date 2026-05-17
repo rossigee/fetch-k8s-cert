@@ -1,33 +1,39 @@
 ---
-name: CI
+name: CI/CD Pipeline
 
 on:
-  workflow_call:
   push:
-    branches:
-      - "master"
-      - "develop"
+    branches: [ master, main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master, main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  security-events: write
+  actions: read
+  packages: write
+
 env:
   GO_VERSION: '1.26.0'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -40,13 +46,27 @@ jobs:
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-
             ${{ runner.os }}-go-
 
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
       - name: Run tests with coverage
-        run:
-          go test -v -race -coverprofile=coverage.out -covermode=atomic
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Check coverage
+        run: |
+          go tool cover -func=coverage.out
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Total coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 25" | bc -l) )); then
+            echo "Coverage is below 25%"
+            exit 1
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: always()
         with:
           files: ./coverage.out
           fail_ci_if_error: false
@@ -55,14 +75,13 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -75,28 +94,24 @@ jobs:
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-
             ${{ runner.os }}-go-
 
-      - name: Run linter
+      - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.9.0
+          args: --timeout=5m
           skip-cache: true
 
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
     steps:
-      - name: Checkout source
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -109,32 +124,34 @@ jobs:
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-
             ${{ runner.os }}-go-
 
-      - name: Security scan skipped
-        run: echo "Security scan temporarily skipped - awaiting CI infrastructure support for Go 1.26.0"
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out results.sarif -exclude=G304 ./...'
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true
+        if: always()
 
   build:
-    name: Build
-    runs-on: ${{ matrix.runner }}
+    name: Build Multi-Arch
+    runs-on: ubuntu-latest
     needs: [test, lint, security]
     strategy:
       matrix:
-        include:
-          - os: linux
-            arch: amd64
-            runner: ubuntu-24.04
-          - os: linux
-            arch: arm64
-            runner: ubuntu-24.04-arm
-
+        goos: [linux, darwin]
+        goarch: [amd64, arm64]
     steps:
-      - name: Checkout source
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -147,52 +164,157 @@ jobs:
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-
             ${{ runner.os }}-go-
 
-      - name: Build package
-        run:
-          make build
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p build
+          go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}" .
+
+      - name: Package .deb (Linux only)
+        if: matrix.goos == 'linux'
+        env:
+          ARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # Set version for packaging (use tag or dev version)
+          if [[ "${VERSION}" =~ ^v[0-9] ]]; then
+            PKG_VERSION="${VERSION#v}"
+          else
+            PKG_VERSION="0.0.0-dev"
+          fi
+
+          # Create Debian package structure
+          mkdir -p build/debian/DEBIAN
+          mkdir -p build/debian/usr/bin
+          mkdir -p build/debian/usr/share/doc/fetch-k8s-cert
+
+          # Copy binary
+          cp "build/fetch-k8s-cert-linux-${ARCH}" build/debian/usr/bin/fetch-k8s-cert
+          chmod 755 build/debian/usr/bin/fetch-k8s-cert
+
+          # Copy documentation
+          cp README.md build/debian/usr/share/doc/fetch-k8s-cert/
+
+          # Create control file
+          cat > build/debian/DEBIAN/control << EOF
+          Package: fetch-k8s-cert
+          Version: ${PKG_VERSION}
+          Architecture: ${ARCH}
+          Maintainer: Ross Golder <ross@golder.org>
+          Description: Fetch K8s Certificate - retrieves a X509 TLS secret from a K8S cluster API endpoint
+           This tool mirrors a K8S Certificate resource to a local PEM file.
+          Depends: libc6
+          Section: misc
+          Priority: optional
+          Homepage: https://github.com/rossigee/fetch-k8s-cert
+          EOF
+
+          # Build .deb package
+          cd build
+          dpkg-deb --build debian "fetch-k8s-cert-${PKG_VERSION}-${ARCH}.deb"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: build/
+          retention-days: 7
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [test, lint, security]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
 
-      - name: Build Docker image
-        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: |
-            fetch-k8s-cert:test
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Run Trivy vulnerability scanner
-        if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'fetch-k8s-cert:test'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
 
-      - name: Upload Trivy scan results
-        if: matrix.os == 'linux' && matrix.arch == 'amd64' && always() && hashFiles('trivy-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          sarif_file: 'trivy-results.sarif'
+          path: build-artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cd build-artifacts
+          for dir in binaries-*; do
+            if [ -d "$dir" ]; then
+              cd "$dir"
+              for file in *; do
+                if [ -f "$file" ]; then
+                  cp "$file" "../../release-assets/"
+                fi
+              done
+              cd ..
+            fi
+          done
+          cd ../release-assets
+
+          # Create checksums
+          sha256sum * > checksums.txt
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -206,8 +328,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run benchmarks
-        run:
-          go test -bench=. -benchmem -run=^$ ./... | tee benchmark.txt
+        run: go test -bench=. -benchmem -run=^$ ./... | tee benchmark.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4

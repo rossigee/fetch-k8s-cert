@@ -1,4 +1,4 @@
-# Fetch K8s Certificate v2.1.8
+# Fetch K8s Certificate v2.1.9
 
 **Enterprise-grade certificate management tool with comprehensive observability.**
 
@@ -146,7 +146,7 @@ Typically, you would be deploying this either as a 'systemd' service or as a Doc
 1. **Install the Package**
    ```bash
    sudo apt update
-   sudo apt install ./fetch-k8s-cert_2.1.8_amd64.deb
+   sudo apt install ./fetch-k8s-cert_2.1.9_amd64.deb
    ```
 
 2. **Configure the Tool**

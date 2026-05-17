@@ -295,6 +295,7 @@ jobs:
         run: |
           mkdir -p msi-output
           $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+          Copy-Item "dist\windows-amd64\fetch-k8s-cert-windows-amd64.exe" "dist\windows-amd64\fetch-k8s-cert.exe"
           wix build -arch x64 `
             -d Version=$VERSION `
             -d BinaryPath=dist\windows-amd64 `

@@ -142,8 +142,11 @@ jobs:
     needs: [test, lint, security]
     strategy:
       matrix:
-        goos: [linux, darwin]
+        goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -170,7 +173,11 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           mkdir -p build
-          go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}" .
+          if [ "$GOOS" = "windows" ]; then
+            go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}.exe" .
+          else
+            go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}" .
+          fi
 
       - name: Package .deb (Linux only)
         if: matrix.goos == 'linux'
@@ -264,10 +271,47 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  build-windows-msi:
+    name: Build Windows MSI
+    runs-on: windows-latest
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Download Windows amd64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-windows-amd64
+          path: dist/windows-amd64
+
+      - name: Install WiX Toolset
+        run: |
+          dotnet tool install --global wix
+          wix --version
+
+      - name: Build MSI
+        run: |
+          mkdir -p msi-output
+          $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+          wix build -arch x64 `
+            -d Version=$VERSION `
+            -d BinaryPath=dist\windows-amd64 `
+            -out msi-output\fetch-k8s-cert-${VERSION}-amd64.msi `
+            fetch-k8s-cert.wxs
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-windows-amd64
+          path: msi-output/
+          retention-days: 7
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, build-windows-msi]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Check out code

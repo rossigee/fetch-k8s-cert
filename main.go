@@ -13,8 +13,6 @@ import (
 
 var (
 	version = "2.1.8" // Set by build flags
-	log     = logrus.New()
-	obs     *ObservabilityManager
 )
 
 func main() {

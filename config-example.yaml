@@ -1,4 +1,4 @@
-# Example configuration for fetch-k8s-cert v2.1.6
+# Example configuration for fetch-k8s-cert v2.1.8
 
 # Kubernetes API configuration
 k8sAPIURL: https://your.cluster.address:6443

@@ -371,7 +371,7 @@ jobs:
         run: |
           mkdir -p release-assets
           cd build-artifacts
-          for dir in binaries-*; do
+          for dir in binaries-* msi-* pkg-*; do
             if [ -d "$dir" ]; then
               cd "$dir"
               for file in *; do

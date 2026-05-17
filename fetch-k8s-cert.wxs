@@ -1,18 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product
-    Id="*"
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
     Name="Fetch K8s Certificate"
     Language="1033"
     Version="$(var.Version)"
     Manufacturer="Ross Golder"
-    UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
-
-    <Package
-      InstallerVersion="200"
-      Compressed="yes"
-      InstallScope="perMachine"
-      Platform="x64" />
+    UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+    Scope="perMachine">
 
     <MajorUpgrade
       DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -23,26 +17,19 @@
       <ComponentGroupRef Id="ProductComponents" />
     </Feature>
 
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="fetch-k8s-cert" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="fetch-k8s-cert">
+        <Component Id="MainBinary" Guid="*">
+          <File
+            Id="FetchK8sCertExe"
+            Name="fetch-k8s-cert.exe"
+            Source="$(var.BinaryPath)\fetch-k8s-cert.exe"
+            KeyPath="yes" />
+        </Component>
       </Directory>
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="Fetch K8s Certificate" />
-      </Directory>
-    </Directory>
+    </StandardDirectory>
 
-    <DirectoryRef Id="INSTALLFOLDER">
-      <Component Id="MainBinary" Guid="*">
-        <File
-          Id="FetchK8sCertExe"
-          Name="fetch-k8s-cert.exe"
-          Source="$(var.BinaryPath)\fetch-k8s-cert.exe"
-          KeyPath="yes" />
-      </Component>
-    </DirectoryRef>
-
-    <DirectoryRef Id="ApplicationProgramsFolder">
+    <StandardDirectory Id="ProgramMenuFolder">
       <Component Id="ApplicationShortcut" Guid="*">
         <Shortcut
           Id="ApplicationStartMenuShortcut"
@@ -50,7 +37,6 @@
           Description="Fetch K8s Certificate CLI tool"
           Target="[INSTALLFOLDER]fetch-k8s-cert.exe"
           WorkingDirectory="INSTALLFOLDER" />
-        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
         <RegistryValue
           Root="HKCU"
           Key="Software\RossGolder\FetchK8sCert"
@@ -59,12 +45,12 @@
           Value="1"
           KeyPath="yes" />
       </Component>
-    </DirectoryRef>
+    </StandardDirectory>
 
     <ComponentGroup Id="ProductComponents">
       <ComponentRef Id="MainBinary" />
       <ComponentRef Id="ApplicationShortcut" />
     </ComponentGroup>
 
-  </Product>
+  </Package>
 </Wix>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="Fetch K8s Certificate"
+    Language="1033"
+    Version="$(var.Version)"
+    Manufacturer="Ross Golder"
+    UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+
+    <Package
+      InstallerVersion="200"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Platform="x64" />
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="FetchK8sCert" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="fetch-k8s-cert" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="Fetch K8s Certificate" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="MainBinary" Guid="*">
+        <File
+          Id="FetchK8sCertExe"
+          Name="fetch-k8s-cert.exe"
+          Source="$(var.BinaryPath)\fetch-k8s-cert.exe"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="*">
+        <Shortcut
+          Id="ApplicationStartMenuShortcut"
+          Name="Fetch K8s Certificate"
+          Description="Fetch K8s Certificate CLI tool"
+          Target="[INSTALLFOLDER]fetch-k8s-cert.exe"
+          WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\RossGolder\FetchK8sCert"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <ComponentGroup Id="ProductComponents">
+      <ComponentRef Id="MainBinary" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </ComponentGroup>
+
+  </Product>
+</Wix>

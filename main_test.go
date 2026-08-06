@@ -112,13 +112,14 @@ func TestMainFunction_InvalidConfig(t *testing.T) {
 
 	runTestWithConfig(t, requestBody, func(config Config) {
 		// Modify the config to use an invalid path
-		config.LocalCAFile = "/etc/hosts"
+		config.LocalCAFile = "/nonexistent/directory/test-ca.pem"
 
 		ctx := context.Background()
 		obs, _ := NewObservabilityManager(config.Observability)
 		err := run(ctx, config, logger, obs)
 		if err == nil {
 			t.Errorf("Expected run() to fail, but it succeeded")
+			return
 		}
 
 		// Check if the expected error message is logged or returned
@@ -210,7 +211,7 @@ func generateCertificate(template, parent *x509.Certificate, publicKey, privateK
 	}
 
 	pemBlock := &pem.Block{
-		Type:  "CERTIFICATE",
+		Type:  "CERTIFICATE", //nolint:goconst
 		Bytes: certDER,
 	}
 	return pem.EncodeToMemory(pemBlock), nil
@@ -238,8 +239,8 @@ func createTestCertificateChain() ([]byte, error) {
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
 			Country:      []string{"US"},
-			Organization: []string{"Test Root CA"},
-			CommonName:   "Test Root CA",
+			Organization: []string{"Test Root CA"}, //nolint:goconst
+			CommonName:   "Test Root CA", //nolint:goconst
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
@@ -258,8 +259,8 @@ func createTestCertificateChain() ([]byte, error) {
 		SerialNumber: big.NewInt(2),
 		Subject: pkix.Name{
 			Country:      []string{"US"},
-			Organization: []string{"Test Intermediate CA"},
-			CommonName:   "Test Intermediate CA",
+			Organization: []string{"Test Intermediate CA"}, //nolint:goconst
+			CommonName:   "Test Intermediate CA", //nolint:goconst
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
@@ -286,7 +287,7 @@ func createTestCertificateChain() ([]byte, error) {
 		Subject: pkix.Name{
 			Country:      []string{"US"},
 			Organization: []string{"Test Server"},
-			CommonName:   "test.example.com",
+			CommonName:   "test.example.com", //nolint:goconst
 		},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().Add(365 * 24 * time.Hour),

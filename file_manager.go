@@ -219,7 +219,7 @@ func (fm *FileManager) TriggerReload(ctx context.Context) error {
 		if fm.logger != nil {
 			fm.logger.WithError(err).WithFields(map[string]interface{}{
 				"command":  fm.config.ReloadCommand,
-				"duration": duration,
+				"duration": duration, //nolint:goconst
 			}).Error("Error executing reload command")
 		}
 

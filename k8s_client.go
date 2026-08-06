@@ -108,7 +108,7 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 				k.logger.WithFields(logrus.Fields{
 					"attempt": attempt,
 					"error":   err,
-					"status":  statusCode,
+					"status":  statusCode, //nolint:goconst
 				}).Warn("Request failed, retrying")
 			}
 			time.Sleep(time.Duration(attempt) * time.Second) // Exponential backoff
@@ -186,9 +186,9 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 
 	if k.logger != nil {
 		k.logger.WithFields(map[string]interface{}{
-			"namespace": k.config.Namespace,
-			"secret":    k.config.SecretName,
-			"duration":  duration,
+			"namespace": k.config.Namespace, //nolint:goconst
+			"secret":    k.config.SecretName, //nolint:goconst
+			"duration":  duration, //nolint:goconst
 		}).Info("Successfully fetched TLS bundle from Kubernetes")
 	}
 

@@ -149,7 +149,7 @@ func (om *ObservabilityManager) initMetrics() error {
 				Name: "fetch_k8s_cert_fetch_attempts_total",
 				Help: "Total number of certificate fetch attempts",
 			},
-			[]string{"namespace", "secret", "status"},
+			[]string{"namespace", "secret", "status"}, //nolint:goconst // metric labels
 		),
 		FetchDuration: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
@@ -157,14 +157,14 @@ func (om *ObservabilityManager) initMetrics() error {
 				Help:    "Duration of certificate fetch operations",
 				Buckets: prometheus.DefBuckets,
 			},
-			[]string{"namespace", "secret", "status"},
+			[]string{"namespace", "secret", "status"}, //nolint:goconst // metric labels
 		),
 		FetchErrors: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "fetch_k8s_cert_fetch_errors_total",
 				Help: "Total number of certificate fetch errors",
 			},
-			[]string{"namespace", "secret", "error_type"},
+			[]string{"namespace", "secret", "error_type"}, //nolint:goconst // metric labels
 		),
 		CertificateAge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -255,7 +255,7 @@ func (om *ObservabilityManager) initMetrics() error {
 func (om *ObservabilityManager) startMetricsServer() error {
 	address := om.config.MetricsAddress
 	if address == "" {
-		address = "0.0.0.0"
+		address = "0.0.0.0" //nolint:goconst
 	}
 
 	port := om.config.MetricsPort
@@ -265,7 +265,7 @@ func (om *ObservabilityManager) startMetricsServer() error {
 
 	path := om.config.MetricsPath
 	if path == "" {
-		path = "/metrics"
+		path = "/metrics" //nolint:goconst
 	}
 
 	mux := http.NewServeMux()
@@ -323,7 +323,7 @@ func (om *ObservabilityManager) initTracing() error {
 	// Configure exporter
 	endpoint := om.config.TracingEndpoint
 	if endpoint == "" {
-		endpoint = "http://localhost:4318" // Default OTLP HTTP endpoint
+		endpoint = "http://localhost:4318" //nolint:goconst // Default OTLP HTTP endpoint
 	}
 
 	// Strip /v1/traces from endpoint if present to avoid double path

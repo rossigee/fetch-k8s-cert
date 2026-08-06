@@ -16,3 +16,6 @@ build
 
 # dist directory (created during builds)
 dist/
+
+# Vendored dependencies
+vendor/

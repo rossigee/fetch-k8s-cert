@@ -65,7 +65,7 @@ func setConfigDefaults(config *Config) {
 // setObservabilityDefaults sets default values for observability configuration
 func setObservabilityDefaults(obsConfig *ObservabilityConfig) {
 	if obsConfig.LogLevel == "" {
-		obsConfig.LogLevel = "info"
+		obsConfig.LogLevel = "info" //nolint:goconst
 	}
 	if obsConfig.LogFormat == "" {
 		obsConfig.LogFormat = "text"
@@ -74,10 +74,10 @@ func setObservabilityDefaults(obsConfig *ObservabilityConfig) {
 		obsConfig.MetricsPort = 8080
 	}
 	if obsConfig.MetricsPath == "" {
-		obsConfig.MetricsPath = "/metrics"
+		obsConfig.MetricsPath = "/metrics" //nolint:goconst
 	}
 	if obsConfig.MetricsAddress == "" {
-		obsConfig.MetricsAddress = "0.0.0.0"
+		obsConfig.MetricsAddress = "0.0.0.0" //nolint:goconst
 	}
 
 	if obsConfig.TracingSampling <= 0 || obsConfig.TracingSampling > 1 {

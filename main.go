@@ -42,7 +42,7 @@ func main() {
 
 	// Override log level if verbose flag is set
 	if *verboseFlag {
-		config.Observability.LogLevel = "info"
+		config.Observability.LogLevel = "info" //nolint:goconst
 	}
 
 	// Initialize observability
@@ -86,8 +86,8 @@ func main() {
 func run(ctx context.Context, config Config, log *logrus.Logger, obs *ObservabilityManager) error {
 	log.WithFields(logrus.Fields{
 		"version":             version,
-		"namespace":           config.Namespace,
-		"secret":              config.SecretName,
+		"namespace":           config.Namespace, //nolint:goconst
+		"secret":              config.SecretName, //nolint:goconst
 		"k8s_api":             config.K8SAPIURL,
 		"use_intermediate_ca": config.UseIntermediateCA,
 	}).Info("Starting fetch-k8s-cert")

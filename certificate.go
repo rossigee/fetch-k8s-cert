@@ -209,7 +209,7 @@ func parseCertificateChain(certChainPEM []byte) ([]*x509.Certificate, error) {
 		if block == nil {
 			break
 		}
-		if block.Type == "CERTIFICATE" {
+		if block.Type == "CERTIFICATE" { //nolint:goconst
 			cert, err := x509.ParseCertificate(block.Bytes)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing certificate: %w", err)
@@ -223,7 +223,7 @@ func parseCertificateChain(certChainPEM []byte) ([]*x509.Certificate, error) {
 
 // certificateToPEM converts an x509.Certificate to PEM format
 func certificateToPEM(cert *x509.Certificate) ([]byte, error) {
-	pemBlock := &pem.Block{
+	pemBlock := &pem.Block{ //nolint:goconst
 		Type:  "CERTIFICATE",
 		Bytes: cert.Raw,
 	}

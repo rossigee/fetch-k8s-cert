@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -40,6 +42,15 @@ func LoadConfigFromFile(filePath string) (*Config, error) {
 		return nil, fmt.Errorf("error unmarshalling config data: %w", err)
 	}
 
+	// Resolve environment variables in token
+	if config.Token != "" {
+		resolvedToken, err := resolveEnvVars(config.Token)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve token: %w", err)
+		}
+		config.Token = resolvedToken
+	}
+
 	// Set defaults for configuration
 	setConfigDefaults(&config)
 
@@ -49,6 +60,41 @@ func LoadConfigFromFile(filePath string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// resolveEnvVars replaces environment variable references with their values
+// Supports format: ${VAR_NAME} or $VAR_NAME
+func resolveEnvVars(value string) (string, error) {
+	if value == "" {
+		return value, nil
+	}
+
+	// Pattern matches ${VAR_NAME} or $VAR_NAME
+	pattern := regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
+
+	result := pattern.ReplaceAllStringFunc(value, func(match string) string {
+		var varName string
+		if strings.HasPrefix(match, "${") {
+			varName = match[2 : len(match)-1]
+		} else {
+			varName = match[1:]
+		}
+
+		if envValue, exists := os.LookupEnv(varName); exists {
+			return envValue
+		}
+		return match // Return original if env var not found
+	})
+
+	// Check if there are still unresolved variables and return error
+	if pattern.MatchString(result) {
+		unresolved := pattern.FindStringSubmatch(result)
+		if len(unresolved) > 0 {
+			return "", fmt.Errorf("unresolved environment variable: %s", unresolved[0])
+		}
+	}
+
+	return result, nil
 }
 
 // setConfigDefaults sets default values for configuration

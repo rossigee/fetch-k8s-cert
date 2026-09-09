@@ -186,9 +186,9 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 
 	if k.logger != nil {
 		k.logger.WithFields(map[string]interface{}{
-			"namespace": k.config.Namespace, //nolint:goconst
+			"namespace": k.config.Namespace,  //nolint:goconst
 			"secret":    k.config.SecretName, //nolint:goconst
-			"duration":  duration, //nolint:goconst
+			"duration":  duration,            //nolint:goconst
 		}).Info("Successfully fetched TLS bundle from Kubernetes")
 	}
 

@@ -1,5 +1,5 @@
 BINARY_NAME := fetch-k8s-cert
-VERSION := 2.1.10
+VERSION := 2.1.11
 
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 

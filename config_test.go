@@ -21,20 +21,20 @@ func TestResolveEnvVars(t *testing.T) {
 			expected: "literal-token-value",
 		},
 		{
-			name:    "resolve ${VAR} format",
-			input:   "${TEST_TOKEN}",
-			envVars: map[string]string{"TEST_TOKEN": testSecretToken},
+			name:     "resolve ${VAR} format",
+			input:    "${TEST_TOKEN}",
+			envVars:  map[string]string{"TEST_TOKEN": testSecretToken},
 			expected: testSecretToken,
 		},
 		{
-			name:    "resolve $VAR format",
-			input:   "$TEST_TOKEN",
-			envVars: map[string]string{"TEST_TOKEN": testSecretToken},
+			name:     "resolve $VAR format",
+			input:    "$TEST_TOKEN",
+			envVars:  map[string]string{"TEST_TOKEN": testSecretToken},
 			expected: testSecretToken,
 		},
 		{
-			name:    "resolve multiple variables",
-			input:   "${TOKEN1}:${TOKEN2}",
+			name:  "resolve multiple variables",
+			input: "${TOKEN1}:${TOKEN2}",
 			envVars: map[string]string{
 				"TOKEN1": "part1",
 				"TOKEN2": "part2",
@@ -52,9 +52,9 @@ func TestResolveEnvVars(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:    "mixed text and variables",
-			input:   "Bearer ${AUTH_TOKEN}",
-			envVars: map[string]string{"AUTH_TOKEN": "xyz123"},
+			name:     "mixed text and variables",
+			input:    "Bearer ${AUTH_TOKEN}",
+			envVars:  map[string]string{"AUTH_TOKEN": "xyz123"},
 			expected: "Bearer xyz123",
 		},
 	}

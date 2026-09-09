@@ -240,7 +240,7 @@ func createTestCertificateChain() ([]byte, error) {
 		Subject: pkix.Name{
 			Country:      []string{"US"},
 			Organization: []string{"Test Root CA"}, //nolint:goconst
-			CommonName:   "Test Root CA", //nolint:goconst
+			CommonName:   "Test Root CA",           //nolint:goconst
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
@@ -260,7 +260,7 @@ func createTestCertificateChain() ([]byte, error) {
 		Subject: pkix.Name{
 			Country:      []string{"US"},
 			Organization: []string{"Test Intermediate CA"}, //nolint:goconst
-			CommonName:   "Test Intermediate CA", //nolint:goconst
+			CommonName:   "Test Intermediate CA",           //nolint:goconst
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour),

@@ -20,21 +20,21 @@ import (
 )
 
 const (
-	testNamespace   = "test-namespace"
-	testSecret      = "test-secret"
-	testToken       = "test-token"
-	testCertFile    = "/tmp/cert.pem"
-	testKeyFile     = "/tmp/key.pem"
-	testCAFile      = "/tmp/ca.pem"
-	testK8sAPIURL   = "https://kubernetes.example.com"
-	testLogLevel    = "info"
-	testMetricsPath = "/metrics"
-	testMetricsAddr = "0.0.0.0"
-	testTraceEndpoint = "http://localhost:4318"
-	testCertCN      = "Test Certificate"
-	testServerCN    = "Test Server"
-	testServerName  = "test.example.com"
-	testRootCA      = "Test Root CA"
+	testNamespace      = "test-namespace"
+	testSecret         = "test-secret"
+	testToken          = "test-token"
+	testCertFile       = "/tmp/cert.pem"
+	testKeyFile        = "/tmp/key.pem"
+	testCAFile         = "/tmp/ca.pem"
+	testK8sAPIURL      = "https://kubernetes.example.com"
+	testLogLevel       = "info"
+	testMetricsPath    = "/metrics"
+	testMetricsAddr    = "0.0.0.0"
+	testTraceEndpoint  = "http://localhost:4318"
+	testCertCN         = "Test Certificate"
+	testServerCN       = "Test Server"
+	testServerName     = "test.example.com"
+	testRootCA         = "Test Root CA"
 	testIntermediateCA = "Test Intermediate CA"
 )
 
@@ -916,9 +916,9 @@ func TestK8sClient_GetTLSBundle_Success(t *testing.T) {
 
 	secretResponse := map[string]interface{}{
 		"data": map[string]string{
-			"ca.crt":   base64.StdEncoding.EncodeToString(testCA),
-			"tls.crt":  base64.StdEncoding.EncodeToString(testCert),
-			"tls.key":  base64.StdEncoding.EncodeToString(testKey),
+			"ca.crt":  base64.StdEncoding.EncodeToString(testCA),
+			"tls.crt": base64.StdEncoding.EncodeToString(testCert),
+			"tls.key": base64.StdEncoding.EncodeToString(testKey),
 		},
 	}
 

@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -16,10 +18,11 @@ import (
 
 // K8sClient handles communication with the Kubernetes API
 type K8sClient struct {
-	client  *http.Client
-	config  Config
-	logger  *logrus.Logger
-	metrics *Metrics
+	client      *http.Client // ordinary requests
+	watchClient *http.Client // long-lived watch streams (no total timeout)
+	config      Config
+	logger      *logrus.Logger
+	metrics     *Metrics
 }
 
 // NewK8sClient creates a new Kubernetes API client
@@ -56,16 +59,31 @@ func NewK8sClient(config Config, logger *logrus.Logger, metrics *Metrics) (*K8sC
 		Timeout:   timeout,
 	}
 
+	// Watch streams stay open for an extended period, so they must not be
+	// subject to the total request timeout used for ordinary requests.
+	watchClient := &http.Client{
+		Transport: tr,
+	}
+
 	return &K8sClient{
-		client:  client,
-		config:  config,
-		logger:  logger,
-		metrics: metrics,
+		client:      client,
+		watchClient: watchClient,
+		config:      config,
+		logger:      logger,
+		metrics:     metrics,
 	}, nil
 }
 
 // GetTLSBundle fetches the TLS certificate bundle from Kubernetes
 func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
+	tlsBundle, _, err := k.GetTLSBundleWithRV(ctx)
+	return tlsBundle, err
+}
+
+// GetTLSBundleWithRV fetches the TLS certificate bundle from Kubernetes and
+// also returns the resourceVersion of the Secret that was read, so callers can
+// start a watch from a consistent point.
+func (k *K8sClient) GetTLSBundleWithRV(ctx context.Context) (*TLSBundle, string, error) {
 	// Note: We removed global obs, so tracing is disabled for now
 	// If tracing is needed, it should be passed as a parameter
 	var span trace.Span
@@ -83,7 +101,7 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		if span != nil {
 			span.RecordError(err)
 		}
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", k.config.Token))
@@ -121,7 +139,7 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		if span != nil {
 			span.RecordError(err)
 		}
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, "", fmt.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -144,7 +162,7 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		if span != nil {
 			span.RecordError(err)
 		}
-		return nil, err
+		return nil, "", err
 	}
 
 	secretData, err := io.ReadAll(resp.Body)
@@ -155,8 +173,10 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		if span != nil {
 			span.RecordError(err)
 		}
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, "", fmt.Errorf("failed to read response: %w", err)
 	}
+
+	resourceVersion := secretResourceVersion(secretData)
 
 	tlsBundle, err := ExtractTLSBundleFromSecret(secretData, k.config, k.logger, k.metrics)
 	if err != nil {
@@ -166,7 +186,7 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		if span != nil {
 			span.RecordError(err)
 		}
-		return nil, fmt.Errorf("failed to extract TLS bundle: %w", err)
+		return nil, resourceVersion, fmt.Errorf("failed to extract TLS bundle: %w", err)
 	}
 
 	duration := time.Since(start)
@@ -192,5 +212,67 @@ func (k *K8sClient) GetTLSBundle(ctx context.Context) (*TLSBundle, error) {
 		}).Info("Successfully fetched TLS bundle from Kubernetes")
 	}
 
-	return tlsBundle, nil
+	return tlsBundle, resourceVersion, nil
+}
+
+// WatchSecret opens a long-lived Kubernetes watch on the configured Secret.
+// It returns the response body, which the caller streams until it closes.
+func (k *K8sClient) WatchSecret(ctx context.Context, resourceVersion string) (io.ReadCloser, error) {
+	u, err := url.Parse(fmt.Sprintf("%s/api/v1/namespaces/%s/secrets/%s",
+		k.config.K8SAPIURL, k.config.Namespace, k.config.SecretName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse watch URL: %w", err)
+	}
+	query := u.Query()
+	query.Add("watch", "true")
+	query.Add("allowWatchBookmarks", "true")
+	if resourceVersion != "" {
+		query.Add("resourceVersion", resourceVersion)
+	}
+	query.Add("fieldSelector", "metadata.name="+k.config.SecretName)
+	u.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create watch request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", k.config.Token))
+
+	resp, err := k.watchClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start watch: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		defer func() { _ = resp.Body.Close() }()
+		// #nosec G110 // bounded read of the error response
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if readErr != nil {
+			return nil, fmt.Errorf("watch failed with status %s (error reading response: %v)", resp.Status, readErr)
+		}
+		return nil, fmt.Errorf("watch failed with status %s: %s", resp.Status, truncateString(body))
+	}
+
+	return resp.Body, nil
+}
+
+// secretResourceVersion extracts the resourceVersion from a Secret API object.
+func secretResourceVersion(secretJSON []byte) string {
+	var secret struct {
+		Metadata struct {
+			ResourceVersion string `json:"resourceVersion"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal(secretJSON, &secret); err != nil {
+		return ""
+	}
+	return secret.Metadata.ResourceVersion
+}
+
+// truncateString limits the length of a string for safe logging.
+func truncateString(s []byte) string {
+	if len(s) > 4096 {
+		return fmt.Sprintf("%s...", string(s[:4096]))
+	}
+	return string(s)
 }

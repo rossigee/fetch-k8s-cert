@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-09-10
+
+### 🚀 Features
+
+- **Watch Mode**: Added a native long-running mode (`-w`) that watches the Kubernetes Secret via the watch API and re-syncs certificate files the moment the secret changes. No external poll loop required; an idle watcher makes no periodic API calls. Reconnects with exponential backoff and always re-syncs on reconnection.
+- **Multi-Config Directory**: Added `-d <config-dir>` to load and manage one config file (one `*.yaml`) per secret in a single process.
+- **Resync Grid**: Added `--resync <duration>` (default `24h`) as a convergence safety net in watch mode; `0` disables it.
+- **Runtime API Reloads**: Watch mode is designed for zero-downtime reloads (e.g. the HAProxy Runtime API `set ssl cert` / `commit ssl cert`).
+- **Docker Image**: Added `socat` to the alpine image to support HAProxy socket-based reload commands.
+
+### 🔧 Improvements
+
+- Kubernetes client now tracks the secret `resourceVersion` and returns it from fetches so watch connections start from a consistent point.
+- Watch requests use HTTP/2-compatible long-lived streams independent of the normal request timeout.
+
+---
+
 ## [2.1.9] - 2026-05-17
 
 ### 🔧 Improvements

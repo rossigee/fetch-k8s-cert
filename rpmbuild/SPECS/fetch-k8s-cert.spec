@@ -1,5 +1,5 @@
 Name:          fetch-k8s-cert
-Version: 2.1.9
+Version: 3.0.0
 Release:       1%{?dist}
 Summary:       Tool to retrieve x509 TLS certificates from a K8S cluster.
 License:       Public domain

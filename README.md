@@ -1,8 +1,14 @@
-# Fetch K8s Certificate v2.1.9
+# Fetch K8s Certificate v3.0.0
 
 **Enterprise-grade certificate management tool with comprehensive observability.**
 
-A production-ready utility to pull TLS certificates from Kubernetes secrets and write them to disk for consumption by other services. Features include distributed tracing, Prometheus metrics, structured logging, and intermediate CA extraction.
+A production-ready utility to pull TLS certificates from Kubernetes secrets and write them to disk for consumption by other services. Features include distributed tracing, Prometheus metrics, structured logging, intermediate CA extraction, and an event-driven watch mode.
+
+## 🚀 What's New in v3.0.0
+
+- **📡 Native Watch Mode**: `fetch-k8s-cert -w` stays running and re-syncs certificates the moment the Kubernetes secret changes, instead of polling on an external schedule
+- **📁 Multi-Config Support**: `-d <config-dir>` manages one config file per secret in a single process
+- **🔌 Zero-Downtime Reloads**: reload commands fit the HAProxy Runtime API (`set/commit ssl cert`) pattern, eliminating restarts of downstream services
 
 ## 🚀 What's New in v2.0.0
 
@@ -141,12 +147,62 @@ You could run try running this locally...
 
 Typically, you would be deploying this either as a 'systemd' service or as a Docker container in `docker-compose`.
 
+### Watch Mode
+
+Instead of re-running the fetch on a schedule (timer, cron, or a wrapping shell loop), the tool can stay resident and react to changes **as they happen**. An idle watcher makes no periodic Kubernetes API calls; secrets are seen via the Kubernetes watch stream, and the process re-syncs on every connect (the ServiceAccount needs `list` and `watch` verbs on secrets in addition to `get`, see the RBAC example above).
+
+```bash
+# Watch a single secret forever
+./fetch-k8s-cert -w -f config.yaml
+
+# Watch several secrets, one config file each, all in one process
+mkdir /etc/fetch-k8s-cert/conf.d
+cp config-a.yaml config-b.yaml /etc/fetch-k8s-cert/conf.d/
+./fetch-k8s-cert -w -d /etc/fetch-k8s-cert/conf.d
+
+# Disable the 24h safety-net re-sync (0) or change it (--resync 6h)
+./fetch-k8s-cert -w -d /etc/fetch-k8s-cert/conf.d --resync 6h
+```
+
+The periodic re-sync (default 24h) is a convergence net, not a poll loop: on each re-sync and reconnection the certificate files are compared byte-for-byte, and the reload command runs only when something actually changed.
+
+| Flag | Description |
+|------|-------------|
+| `-f <file>` | Single configuration file (one-shot, or with `-w`) |
+| `-d <dir>` | Directory of `*.yaml` config files, one per secret |
+| `-w` | Watch mode: long-running, event-driven |
+| `--resync <dur>` | Safety-net re-sync interval (default `24h`, `0` disables) |
+| `-v` | Verbose logging |
+| `--version` | Print version |
+
+Run as a systemd service:
+```ini
+[Unit]
+Description=fetch-k8s-cert watch
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/fetch-k8s-cert -w -d /etc/fetch-k8s-cert/conf.d
+Restart=always
+```
+
+As a Docker container:
+```yaml
+cert-fetcher:
+  image: ghcr.io/rossigee/fetch-k8s-cert:3.0.0
+  command: ["-w", "-d", "/etc/fetch-k8s-cert"]
+  volumes:
+    - ./config:/etc/fetch-k8s-cert
+    - ./certs:/etc/ssl/certs
+  restart: always
+```
+
 ### Debian Package Installation on Ubuntu
 
 1. **Install the Package**
    ```bash
    sudo apt update
-   sudo apt install ./fetch-k8s-cert_2.1.9_amd64.deb
+   sudo apt install ./fetch-k8s-cert_3.0.0_amd64.deb
    ```
 
 2. **Configure the Tool**

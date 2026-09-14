@@ -6,7 +6,7 @@ COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o fetch-k8s-cert .
 
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates socat
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=builder /app/fetch-k8s-cert /usr/local/bin/fetch-k8s-cert
 RUN chown appuser:appgroup /usr/local/bin/fetch-k8s-cert && chmod 755 /usr/local/bin/fetch-k8s-cert

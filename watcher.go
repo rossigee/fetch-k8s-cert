@@ -227,5 +227,5 @@ func isForbiddenError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, io.EOF) == false && strings.Contains(err.Error(), "403 Forbidden")
+	return !errors.Is(err, io.EOF) && strings.Contains(err.Error(), "403 Forbidden")
 }

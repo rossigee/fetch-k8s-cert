@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -69,6 +70,7 @@ func (w *SecretWatcher) SetResyncPeriod(period time.Duration) {
 
 // Watch runs the watcher until ctx is cancelled. Failures are logged and never
 // kill the watcher; transient errors are handled with reconnect backoff.
+// Permission errors (403) are logged but not retried since they won't succeed with waiting.
 func (w *SecretWatcher) Watch(ctx context.Context) {
 	for {
 		if ctx.Err() != nil {
@@ -76,6 +78,12 @@ func (w *SecretWatcher) Watch(ctx context.Context) {
 		}
 
 		if resourceVersion, err := w.sync(ctx); err != nil {
+			if isForbiddenError(err) {
+				w.log(ctx).WithError(err).Warn("Permission denied (403), skipping this secret")
+				w.reconnectInterval = defaultReconnectInterval
+				// Don't retry permission errors; they won't succeed with backoff
+				return
+			}
 			w.log(ctx).WithError(err).Error("Sync failed, will retry")
 			if !w.wait(ctx) {
 				return
@@ -212,4 +220,12 @@ func (w *SecretWatcher) log(_ context.Context) *logrus.Entry {
 		"namespace": w.config.Namespace,  //nolint:goconst
 		"secret":    w.config.SecretName, //nolint:goconst
 	})
+}
+
+// isForbiddenError checks if an error is a 403 Forbidden response from the Kubernetes API.
+func isForbiddenError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, io.EOF) == false && strings.Contains(err.Error(), "403 Forbidden")
 }

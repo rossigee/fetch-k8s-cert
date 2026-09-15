@@ -22,11 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.1.1] - 2569-09-15
+## [3.1.1] - 2026-09-15
+
+### 🐛 Bug Fixes
+
+- **Watch Mode**: Stop retrying permission-denied (403) errors during secret sync. The watcher now logs the error and exits for that secret instead of reconnecting in a loop, since retries will never succeed.
 
 ### 🔧 Improvements
 
-- Release 3.1.1
+- **CI/CD**: Prefix Docker image tags with `v` (e.g. `v3.1.1`, `v3.1`, `v3`) for consistency with git tags.
 
 ---
 

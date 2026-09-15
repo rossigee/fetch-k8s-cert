@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.3] - 2026-09-15
+
+### 🐛 Bug Fixes
+
+- **Watch Mode Reliability**: Force HTTP/1.1 for watch connections to sidestep HTTP/2 stream-level disruption (CVE-2023-44487 mitigations in Kubernetes v1.35+). Watch streams were closing and reconnecting roughly every ~1 second due to server-side HTTP/2 GOAWAY-style behavior; forcing HTTP/1.1 eliminates this by removing HTTP/2 from the picture entirely for long-lived watch streams.
+- **Reconnect Backoff**: Fixed exponential backoff logic in watch mode. Previously, `reconnectInterval` was reset to 1 second on every successful API call (even transient watch failures), causing the tool to hammer the apiserver with a fresh watch request every second instead of escalating delays. Now, backoff only resets after a watch stream has been stable (connected ≥30 seconds); consecutive flapping reconnects properly escalate delays to spread load.
+
 ## [3.0.0] - 2026-09-10
 
 ### 🚀 Features

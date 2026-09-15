@@ -72,8 +72,14 @@ func NewK8sClient(config Config, logger *logrus.Logger, metrics *Metrics) (*K8sC
 
 	// Watch streams stay open for an extended period, so they must not be
 	// subject to the total request timeout used for ordinary requests.
+	// Force HTTP/1.1 for watches to sidestep HTTP/2 stream-level issues
+	// (CVE-2023-44487 mitigations causing RST_STREAM on long-lived streams).
+	watchTr := tr.Clone()
+	watchTr.TLSClientConfig.NextProtos = []string{"http/1.1"} // disable h2 ALPN offer
+	watchTr.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper) // disable HTTP/2 upgrade
+
 	watchClient := &http.Client{
-		Transport: tr,
+		Transport: watchTr,
 	}
 
 	return &K8sClient{

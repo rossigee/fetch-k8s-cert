@@ -28,6 +28,11 @@ const (
 	defaultResyncPeriod      = 24 * time.Hour
 )
 
+// minStableWatchDuration is how long a watch stream must remain connected before
+// a subsequent failure is treated as a fresh problem (resetting backoff) rather
+// than a continuation of a flapping connection.
+var minStableWatchDuration = 30 * time.Second
+
 // SecretWatcher keeps the local certificate files in sync with a Kubernetes
 // TLS secret. It performs a full fetch on startup and then waits on the
 // Kubernetes watch API, re-running the fetch pipeline whenever the secret
@@ -90,9 +95,11 @@ func (w *SecretWatcher) Watch(ctx context.Context) {
 			}
 			continue
 		} else {
-			w.reconnectInterval = defaultReconnectInterval
-
+			streamStart := time.Now()
 			err := w.watchStream(ctx, resourceVersion)
+			if time.Since(streamStart) >= minStableWatchDuration {
+				w.reconnectInterval = defaultReconnectInterval
+			}
 			if ctx.Err() != nil {
 				return
 			}

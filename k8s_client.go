@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -35,8 +36,18 @@ func NewK8sClient(config Config, logger *logrus.Logger, metrics *Metrics) (*K8sC
 	}
 
 	tr := &http.Transport{
-		TLSClientConfig: tlsConfig,
+		TLSClientConfig:      tlsConfig,
+		DisableKeepAlives:    false,
+		IdleConnTimeout:      90 * time.Second,
+		MaxIdleConnsPerHost:  10,
+		MaxConnsPerHost:      0, // unlimited
 	}
+
+	// Enable TCP keep-alive for long-lived watch connections (fixes QNAP network timeouts)
+	tr.DialContext = (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
 
 	if !config.SkipTLSVerification && config.K8SCACertFile != "" {
 		// #nosec G304

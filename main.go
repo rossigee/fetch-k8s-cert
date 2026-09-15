@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	version = "3.1.3" // Set by build flags
+	version = "3.2.0" // Set by build flags
 )
 
 func main() {
@@ -24,6 +24,8 @@ func main() {
 	configDirPath := flag.String("d", "", "Path to a directory of configuration files (one per secret)")
 	watchFlag := flag.Bool("w", false, "Run in watch mode: fetch once on startup, then watch the secret(s) for changes")
 	resync := flag.Duration("resync", defaultResyncPeriod, "How often to re-fetch each secret as a safety net (watch mode only, 0 to disable)")
+	pollFlag := flag.Bool("p", false, "Run in polling daemon mode: fetch on startup, then re-fetch on a fixed interval (alternative to watch mode -w)")
+	pollInterval := flag.Duration("poll-interval", 20*time.Minute, "Interval between fetches in polling mode (-p only)")
 	verboseFlag := flag.Bool("v", false, "Enable verbose logging (info level)")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	flag.Parse()
@@ -42,6 +44,11 @@ func main() {
 	}
 	if *configFilePath != "" && *configDirPath != "" {
 		fmt.Println("Please provide either -f or -d, not both.")
+		os.Exit(1)
+	}
+
+	if *watchFlag && *pollFlag {
+		fmt.Println("Please provide either -w (watch mode) or -p (polling mode), not both.")
 		os.Exit(1)
 	}
 
@@ -101,24 +108,33 @@ func main() {
 		return
 	}
 
-	// Watch mode: one watcher per configuration.
-	for i := range configs {
-		config := configs[i]
-		k8sClient, err := NewK8sClient(config, log, obs.Metrics())
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"namespace": config.Namespace,  //nolint:goconst
-				"secret":    config.SecretName, //nolint:goconst
-			}).WithError(err).Error("Failed to create Kubernetes client")
-			continue
+	// Watch mode or polling mode: one watcher/poller per configuration.
+	if *watchFlag {
+		for i := range configs {
+			config := configs[i]
+			k8sClient, err := NewK8sClient(config, log, obs.Metrics())
+			if err != nil {
+				log.WithFields(logrus.Fields{
+					"namespace": config.Namespace,  //nolint:goconst
+					"secret":    config.SecretName, //nolint:goconst
+				}).WithError(err).Error("Failed to create Kubernetes client")
+				continue
+			}
+			fileManager := NewFileManager(config, log, obs.Metrics())
+			watcher := NewSecretWatcher(config, k8sClient, fileManager, log, obs.Metrics())
+			watcher.SetResyncPeriod(*resync)
+			go watcher.Watch(ctx)
 		}
-		fileManager := NewFileManager(config, log, obs.Metrics())
-		watcher := NewSecretWatcher(config, k8sClient, fileManager, log, obs.Metrics())
-		watcher.SetResyncPeriod(*resync)
-		go watcher.Watch(ctx)
+		log.Info("Watch mode started, waiting for certificate changes")
+	} else if *pollFlag {
+		for i := range configs {
+			config := configs[i]
+			go pollLoop(ctx, config, log, obs, *pollInterval)
+		}
+		log.WithFields(logrus.Fields{
+			"interval": pollInterval,
+		}).Info("Polling mode started, fetching on interval")
 	}
-
-	log.Info("Watch mode started, waiting for certificate changes")
 	<-ctx.Done()
 	log.Info("Shutting down...")
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -205,4 +221,18 @@ func run(ctx context.Context, config Config, log *logrus.Logger, obs *Observabil
 
 	log.Info("Certificate update process completed successfully")
 	return nil
+}
+
+// pollLoop runs fetch-and-reload cycles at a fixed interval until ctx is cancelled.
+func pollLoop(ctx context.Context, config Config, log *logrus.Logger, obs *ObservabilityManager, interval time.Duration) {
+	for {
+		if err := run(ctx, config, log, obs); err != nil {
+			log.WithError(err).Error("Poll cycle failed, will retry next interval")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(interval):
+		}
+	}
 }

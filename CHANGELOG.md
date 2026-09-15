@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-09-15
+
+### 🚀 Features
+
+- **Polling Daemon Mode**: Added `-p` (polling) flag as a reliable alternative to watch mode. Fetches certificates on startup, then re-fetches on a fixed interval (default 20 minutes, configurable with `-poll-interval`). Use this instead of `-w` on infrastructure where the Kubernetes API server has reliability issues with long-lived watch connections. Runs as a single long-lived daemon, sharing logs across all configured secrets (like `-w -d`), with proper signal handling and graceful shutdown.
+
 ## [3.1.3] - 2026-09-15
 
 ### 🐛 Bug Fixes

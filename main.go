@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	version = "3.0.0" // Set by build flags
+	version = "3.1.1" // Set by build flags
 )
 
 func main() {

@@ -1,4 +1,4 @@
-# Fetch K8s Certificate v3.0.0
+# Fetch K8s Certificate v3.1.1
 
 **Enterprise-grade certificate management tool with comprehensive observability.**
 
@@ -202,7 +202,7 @@ cert-fetcher:
 1. **Install the Package**
    ```bash
    sudo apt update
-   sudo apt install ./fetch-k8s-cert_3.0.0_amd64.deb
+   sudo apt install ./fetch-k8s-cert_3.1.1_amd64.deb
    ```
 
 2. **Configure the Tool**

@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	version = "3.2.0" // Set by build flags
+	version = "3.2.1" // Set by build flags
 )
 
 func main() {
@@ -90,7 +90,7 @@ func main() {
 		cancel()
 	}()
 
-	if !*watchFlag {
+	if !*watchFlag && !*pollFlag {
 		for i := range configs {
 			if err := run(ctx, configs[i], log, obs); err != nil {
 				log.WithFields(logrus.Fields{

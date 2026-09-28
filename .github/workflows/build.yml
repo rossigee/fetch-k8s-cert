@@ -53,7 +53,7 @@ jobs:
         run: go mod verify
 
       - name: Run tests with coverage
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./cmd/fetch-k8s-cert/...
 
       - name: Check coverage
         run: |
@@ -98,7 +98,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13.2
-          args: --timeout=5m
+          args: --timeout=5m ./cmd/fetch-k8s-cert/...
           skip-cache: true
 
   security:
@@ -127,7 +127,7 @@ jobs:
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
-          args: '-no-fail -fmt sarif -out results.sarif -exclude=G304 ./...'
+          args: '-no-fail -fmt sarif -out results.sarif -exclude=G304 ./cmd/fetch-k8s-cert/...'
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v4
@@ -174,9 +174,9 @@ jobs:
         run: |
           mkdir -p build
           if [ "$GOOS" = "windows" ]; then
-            go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}.exe" .
+            go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}.exe" ./cmd/fetch-k8s-cert
           else
-            go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}" .
+            go build -ldflags="-s -w" -o "build/fetch-k8s-cert-${GOOS}-${GOARCH}" ./cmd/fetch-k8s-cert
           fi
 
       - name: Package .deb (Linux only)
@@ -202,7 +202,7 @@ jobs:
           chmod 755 build/debian/usr/bin/fetch-k8s-cert
 
           # Copy documentation
-          cp README.md build/debian/usr/share/doc/fetch-k8s-cert/
+          cp docs/README.md build/debian/usr/share/doc/fetch-k8s-cert/
 
           # Create control file
           cat > build/debian/DEBIAN/control << EOF
@@ -446,7 +446,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run benchmarks
-        run: go test -bench=. -benchmem -run=^$ ./... | tee benchmark.txt
+        run: go test -bench=. -benchmem -run=^$ ./cmd/fetch-k8s-cert/... | tee benchmark.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4

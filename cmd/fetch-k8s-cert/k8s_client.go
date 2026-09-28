@@ -36,11 +36,11 @@ func NewK8sClient(config Config, logger *logrus.Logger, metrics *Metrics) (*K8sC
 	}
 
 	tr := &http.Transport{
-		TLSClientConfig:      tlsConfig,
-		DisableKeepAlives:    false,
-		IdleConnTimeout:      90 * time.Second,
-		MaxIdleConnsPerHost:  10,
-		MaxConnsPerHost:      0, // unlimited
+		TLSClientConfig:     tlsConfig,
+		DisableKeepAlives:   false,
+		IdleConnTimeout:     90 * time.Second,
+		MaxIdleConnsPerHost: 10,
+		MaxConnsPerHost:     0, // unlimited
 	}
 
 	// Enable TCP keep-alive for long-lived watch connections (fixes QNAP network timeouts)
@@ -75,7 +75,7 @@ func NewK8sClient(config Config, logger *logrus.Logger, metrics *Metrics) (*K8sC
 	// Force HTTP/1.1 for watches to sidestep HTTP/2 stream-level issues
 	// (CVE-2023-44487 mitigations causing RST_STREAM on long-lived streams).
 	watchTr := tr.Clone()
-	watchTr.TLSClientConfig.NextProtos = []string{"http/1.1"} // disable h2 ALPN offer
+	watchTr.TLSClientConfig.NextProtos = []string{"http/1.1"}                                     // disable h2 ALPN offer
 	watchTr.TLSNextProto = make(map[string]func(authority string, c *tls.Conn) http.RoundTripper) // disable HTTP/2 upgrade
 
 	watchClient := &http.Client{

@@ -1,0 +1,12 @@
+[Unit]
+Description=Fetch TLS certificate from Kubernetes
+After=network.target
+
+[Service]
+Type=simple
+User=fetch-k8s-cert
+WorkingDirectory=/tmp
+ExecStart=/usr/bin/fetch-k8s-cert -f /etc/fetch-k8s-cert.conf
+
+[Install]
+WantedBy=multi-user.target

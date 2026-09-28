@@ -1,0 +1,8 @@
+k8sAPIURL: https://k8s-api.staging.golder.lan:6443
+token: eyJhbG..yourtokenhere..rOH4wPIQ
+namespace: internal
+certName: internal-tls
+localFilePath: /tmp/internal-tls.pem
+reloadCommand: "echo 'The cert changed.'"
+#caCertFilePath: /...
+skipTLSVerification: true

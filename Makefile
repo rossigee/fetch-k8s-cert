@@ -6,25 +6,25 @@ LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 .PHONY: build
 build: clean
 	@[ -d build ] || mkdir -vp build
-	go build -v $(LDFLAGS) -o build/$(BINARY_NAME)
+	go build -v $(LDFLAGS) -o build/$(BINARY_NAME) ./cmd/fetch-k8s-cert
 
 .PHONY: test
 test:
-	go test -v ./...
+	go test -v ./cmd/fetch-k8s-cert/...
 
 .PHONY: lint
 lint: fmt-check
-	golangci-lint run
+	golangci-lint run ./cmd/fetch-k8s-cert/...
 
 .PHONY: fmt
 fmt:
-	gofmt -s -d .
+	gofmt -s -d ./cmd/fetch-k8s-cert
 
 .PHONY: fmt-check
 fmt-check:
-	@if [ -n "$$(gofmt -s -d .)" ]; then \
+	@if [ -n "$$(gofmt -s -d ./cmd/fetch-k8s-cert)" ]; then \
 		echo "Code is not formatted properly:"; \
-		gofmt -s -d .; \
+		gofmt -s -d ./cmd/fetch-k8s-cert; \
 		exit 1; \
 	fi
 

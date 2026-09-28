@@ -1,5 +1,8 @@
 /fetch-k8s-cert
 /config.yaml
+debian/.debhelper/
+debian/fetch-k8s-cert/
+debian/fetch-k8s-cert.debhelper.log
 debian/fetch-k8s-cert.substvars
 debian/files
 build

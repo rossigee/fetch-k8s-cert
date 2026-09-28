@@ -342,6 +342,274 @@ time="2025-07-07T13:55:57+07:00" level=info msg="Server certificate subject: ser
 time="2025-07-07T13:55:57+07:00" level=info msg="Found intermediate CA at position 1: Example Intermediate CA"
 ```
 
+## Observability
+
+`fetch-k8s-cert` provides enterprise-grade observability with **structured logging**, **Prometheus metrics**, and **distributed tracing (OpenTelemetry)**. All observability features are optional and configured via the YAML config file.
+
+### Configuration
+
+Add an `observability` section to your config file:
+
+```yaml
+k8sAPIURL: https://kubernetes.example.com:6443
+namespace: default
+secretName: my-cert
+localCertFile: /etc/ssl/certs/tls.crt
+localKeyFile: /etc/ssl/private/tls.key
+
+# Observability configuration
+observability:
+  # Logging
+  logLevel: info                    # debug, info, warn, error (default: info)
+  logFormat: json                   # json or text (default: text)
+  logToFile: false                  # write logs to file
+  logFile: /var/log/fetch-k8s-cert.log
+  enableStructured: true            # enable structured logging (overrides logFormat)
+
+  # Metrics (Prometheus)
+  enableMetrics: true               # enable Prometheus metrics (default: false)
+  metricsPort: 8080                 # metrics server port (default: 8080)
+  metricsPath: /metrics             # metrics endpoint path (default: /metrics)
+  metricsAddress: 0.0.0.0           # bind address (default: 0.0.0.0)
+
+  # Tracing (OpenTelemetry)
+  enableTracing: true               # enable OpenTelemetry tracing (default: false)
+  tracingEndpoint: http://otel-collector:4318  # OTLP HTTP endpoint
+  tracingHeaders:                   # optional: custom headers for tracing
+    Authorization: "Bearer token"
+  tracingSampling: 1.0              # sampling ratio 0.0-1.0 (default: 1.0)
+```
+
+### Metrics
+
+When metrics are enabled, the following Prometheus metrics are exported at `http://localhost:8080/metrics`:
+
+#### Operational Metrics
+- `fetch_k8s_cert_fetch_attempts_total` (counter) — Total certificate fetch attempts
+  - Labels: `namespace`, `secret`, `status`
+- `fetch_k8s_cert_fetch_duration_seconds` (histogram) — Duration of fetch operations
+  - Labels: `namespace`, `secret`, `status`
+- `fetch_k8s_cert_fetch_errors_total` (counter) — Total fetch errors
+  - Labels: `namespace`, `secret`, `error_type`
+- `fetch_k8s_cert_certificate_age_seconds` (gauge) — Current certificate age
+  - Labels: `namespace`, `secret`
+- `fetch_k8s_cert_certificate_expiry_seconds` (gauge) — Seconds until certificate expiry
+  - Labels: `namespace`, `secret`
+
+#### File Operations
+- `fetch_k8s_cert_file_writes_total` (counter) — Certificate file writes
+  - Labels: `file_type`, `status`
+- `fetch_k8s_cert_file_write_errors_total` (counter) — File write errors
+  - Labels: `file_type`, `error_type`
+- `fetch_k8s_cert_reload_attempts_total` (counter) — Service reload attempts
+  - Labels: `status`
+- `fetch_k8s_cert_reload_errors_total` (counter) — Reload errors
+  - Labels: `error_type`
+
+#### Certificate Validation
+- `fetch_k8s_cert_validation_total` (counter) — Certificate validations
+  - Labels: `validation_type`, `status`
+- `fetch_k8s_cert_ca_extractions_total` (counter) — CA extraction attempts
+  - Labels: `extraction_type`, `status`
+- `fetch_k8s_cert_ca_extraction_errors_total` (counter) — CA extraction errors
+  - Labels: `error_type`
+
+#### Health Check
+- `GET /health` — Returns 200 OK when metrics server is running
+
+#### Example Prometheus Scrape Config
+
+```yaml
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: 'fetch-k8s-cert'
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
+### Logging
+
+Logs can be written to stdout (default) or to a file. Structured logging (JSON format) is ideal for log aggregation systems like Loki, ELK, or Splunk.
+
+#### Log Levels
+- `debug` — Detailed operational logs (verbose)
+- `info` — Standard operational logs (default)
+- `warn` — Warning and error logs
+- `error` — Errors only
+
+#### Log Formats
+
+**Text format (default)**:
+```
+time="2025-07-07T13:55:57+07:00" level=info msg="Certificate files changed, triggering reload" namespace=default secret=my-cert
+```
+
+**JSON format (structured)**:
+```json
+{
+  "timestamp": "2025-07-07T13:55:57Z",
+  "level": "info",
+  "message": "Certificate files changed, triggering reload",
+  "namespace": "default",
+  "secret": "my-cert"
+}
+```
+
+#### Example Config for File Logging
+
+```yaml
+observability:
+  logLevel: info
+  logFormat: json
+  logToFile: true
+  logFile: /var/log/fetch-k8s-cert/app.log
+  enableStructured: true
+```
+
+Ensure the log directory exists and the process has write permissions:
+```bash
+sudo mkdir -p /var/log/fetch-k8s-cert
+sudo chown fetch-k8s-cert:fetch-k8s-cert /var/log/fetch-k8s-cert
+sudo chmod 750 /var/log/fetch-k8s-cert
+```
+
+### Tracing (OpenTelemetry)
+
+Distributed tracing helps you understand the flow of operations and diagnose performance issues. `fetch-k8s-cert` sends traces to an OpenTelemetry collector using the OTLP HTTP protocol.
+
+#### OpenTelemetry Collector Setup
+
+Run an OTLP collector in your infrastructure (example Docker Compose):
+
+```yaml
+version: '3.8'
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4318:4318"  # OTLP HTTP receiver
+    volumes:
+      - ./otel-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"  # Jaeger UI
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+```
+
+Create `otel-config.yaml`:
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+exporters:
+  jaeger:
+    endpoint: http://jaeger:14250
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger]
+```
+
+#### fetch-k8s-cert Tracing Config
+
+```yaml
+observability:
+  enableTracing: true
+  tracingEndpoint: http://otel-collector:4318
+  tracingSampling: 0.5  # Sample 50% of traces
+```
+
+#### Viewing Traces
+
+Access the Jaeger UI at `http://localhost:16686` to view traces and spans for certificate fetch operations.
+
+### Complete Example Configuration
+
+Here's a production-ready configuration with all observability features:
+
+```yaml
+k8sAPIURL: https://kubernetes.example.com:6443
+k8sCACertFile: /etc/ssl/certs/ca.crt
+token: ${K8S_TOKEN}
+namespace: cert-management
+secretName: production-tls
+
+localCAFile: /etc/ssl/certs/production-ca.pem
+localCertFile: /etc/ssl/certs/production-cert.pem
+localKeyFile: /etc/ssl/private/production-key.pem
+
+reloadCommand: "systemctl reload nginx"
+httpClientTimeout: 30
+
+observability:
+  # Logging to file in JSON format for log aggregation
+  logLevel: info
+  logFormat: json
+  logToFile: true
+  logFile: /var/log/fetch-k8s-cert/production.log
+  enableStructured: true
+
+  # Prometheus metrics for monitoring and alerting
+  enableMetrics: true
+  metricsPort: 8080
+  metricsPath: /metrics
+  metricsAddress: 127.0.0.1
+
+  # Distributed tracing for debugging
+  enableTracing: true
+  tracingEndpoint: http://otel-collector.observability:4318
+  tracingSampling: 0.5
+  tracingHeaders:
+    Authorization: "Bearer eyJhbGciOiJIUzI1NiIs..."
+```
+
+### Monitoring Checklist
+
+Set up alerts on these key metrics:
+
+| Metric | Alert Condition | Action |
+|--------|-----------------|--------|
+| `fetch_k8s_cert_fetch_errors_total` | Error rate > 5% | Page oncall, check K8s API connectivity |
+| `fetch_k8s_cert_certificate_expiry_seconds` | < 7 days (604800s) | Verify cert-manager renewal process |
+| `fetch_k8s_cert_certificate_expiry_seconds` | < 1 day (86400s) | Critical: Certificate expiring soon |
+| `fetch_k8s_cert_reload_errors_total` | > 0 | Verify reload command configuration |
+| Metrics endpoint health | HTTP 200 | Metrics server availability |
+
+### Troubleshooting
+
+**Metrics not appearing:**
+- Verify `enableMetrics: true` in config
+- Check metrics server is running: `curl http://localhost:8080/metrics`
+- Verify firewall allows access to metrics port
+
+**Traces not appearing in collector:**
+- Verify `enableTracing: true` in config
+- Check collector is reachable: `curl http://otel-collector:4318/v1/traces` (should return 400, not timeout)
+- Enable debug logging: `logLevel: debug`
+
+**High log volume:**
+- Reduce log level to `warn` or `error`
+- Disable structured logging if not needed
+- Adjust sampling to `tracingSampling: 0.1` for 10% of traces
+
 ## Development
 
 ### Building from Source

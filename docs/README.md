@@ -1,31 +1,180 @@
-# Fetch K8s Certificate v3.1.1
+# fetch-k8s-cert
 
-**Enterprise-grade certificate management tool with comprehensive observability.**
+[![Build Status](https://github.com/rossigee/fetch-k8s-cert/workflows/CI/badge.svg)](https://github.com/rossigee/fetch-k8s-cert/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rossigee/fetch-k8s-cert)](https://goreportcard.com/report/github.com/rossigee/fetch-k8s-cert)
+[![codecov](https://codecov.io/gh/rossigee/fetch-k8s-cert/branch/master/graph/badge.svg)](https://codecov.io/gh/rossigee/fetch-k8s-cert)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Version](https://img.shields.io/badge/version-3.2.1-green.svg)
 
-A production-ready utility to pull TLS certificates from Kubernetes secrets and write them to disk for consumption by other services. Features include distributed tracing, Prometheus metrics, structured logging, intermediate CA extraction, and an event-driven watch mode.
+**Enterprise-grade certificate management for services running outside Kubernetes.**
 
-## 🚀 What's New in v3.0.0
+A production-ready utility that pulls TLS certificates from Kubernetes secrets and writes them to disk for external services. Ideal for organizations leveraging `cert-manager` to manage certificates across cluster boundaries.
 
-- **📡 Native Watch Mode**: `fetch-k8s-cert -w` stays running and re-syncs certificates the moment the Kubernetes secret changes, instead of polling on an external schedule
-- **📁 Multi-Config Support**: `-d <config-dir>` manages one config file per secret in a single process
-- **🔌 Zero-Downtime Reloads**: reload commands fit the HAProxy Runtime API (`set/commit ssl cert`) pattern, eliminating restarts of downstream services
+## Overview
 
-## 🚀 What's New in v2.0.0
+`fetch-k8s-cert` solves the problem of sharing certificates managed by Kubernetes' `cert-manager` with services running outside the cluster. Rather than deploying complex certificate renewal tools at the edge, use your existing K8s infrastructure.
 
-- **📊 Comprehensive Observability**: Prometheus metrics, OpenTelemetry tracing, structured logging
-- **🏗️ Modular Architecture**: Clean separation of concerns with focused modules
-- **🔍 Enhanced Monitoring**: 12 metrics covering all operations, health checks, certificate expiry tracking
-- **🔒 Security**: Enhanced error handling, security scanning, non-root container execution
-- **⚡ Performance**: Optimized memory usage, context-aware operations, graceful shutdown
-- **🧪 Quality**: Comprehensive test suite, linting, benchmarks, 95%+ test coverage
+**Key Use Cases:**
+- External databases needing K8s-managed certificates
+- Legacy services requiring certificate rotation
+- Multi-cloud environments with centralized K8s cert management
+- Services in VMs, on-premises, or other clusters
 
-This program is designed to connect to a Kubernetes API, fetch the contents of a TLS Certificate resource and compare it to the existing local copy. If the certificate has been updated on the cluster, the local copy will be replaced and a reload command will be triggered, which may be used to restart any dependent services.
+## Quick Start
 
-The primary use case for this is for organisations already running K8S clusters to be able to leverage their existing `cert-manager` deployment to manage certificates for services running outside of the cluster too. This may be a better solution for many organisations that would prefer not to deploy more complicated tools (i.e. `certbot`) at towards the edge.
+### Watch Mode (Recommended)
 
-## Kubernetes configuration
+```bash
+# Start watching for certificate changes
+./fetch-k8s-cert -w -f config.yaml
 
-Assuming you're using `cert-manager` and have already configured your `Issuer`/`ClusterIssuer` resources. To produce the TLS Secret resources, you would likely just need to create a `Certificate` resource (i.e. in Flux/ArgoCD), and a `ServiceAccount` that can read the resulting TLS `Secret`. For example:
+# Watch multiple certificates in one process
+./fetch-k8s-cert -w -d /etc/fetch-k8s-cert/conf.d
+```
+
+### One-Shot Mode
+
+```bash
+# Fetch certificate once and exit
+./fetch-k8s-cert -f config.yaml
+```
+
+### Polling Mode
+
+```bash
+# Fetch on startup, then periodically
+./fetch-k8s-cert -p -f config.yaml
+```
+
+## Core Features
+
+| Feature | Benefit |
+|---------|---------|
+| **🎯 Event-Driven** | React to K8s secret changes instantly, no polling overhead |
+| **🔄 Watch Mode** | Long-running daemon that syncs on every secret update |
+| **📦 Multi-Config** | Manage 100+ certificates in a single process with `-d <dir>` |
+| **🔌 Zero-Downtime** | HAProxy Runtime API compatible reload commands |
+| **📊 Enterprise Observability** | Prometheus metrics, OpenTelemetry tracing, structured JSON logs |
+| **🔗 Smart CA Extraction** | Automatically find intermediate CAs in certificate chains |
+| **🛡️ Secure by Default** | Non-root execution, TLS verification enforced, input validation |
+| **⚡ Production Ready** | 63% test coverage, 72 passing tests, race-condition free |
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Kubernetes Setup](#kubernetes-setup)
+- [Observability](#observability)
+- [Intermediate CA Extraction](#intermediate-ca-extraction)
+- [Development](#development)
+- [License](#license)
+- [Resources](#resources)
+
+## Installation
+
+### Debian/Ubuntu Package
+
+```bash
+sudo apt update
+sudo apt install ./fetch-k8s-cert_3.2.1_amd64.deb
+```
+
+### Docker
+
+```bash
+docker run -v ./config:/etc/fetch-k8s-cert \
+           -v ./certs:/etc/ssl/certs \
+           ghcr.io/rossigee/fetch-k8s-cert:latest \
+           -w -f /etc/fetch-k8s-cert/config.yaml
+```
+
+### Binary Release
+
+Download pre-built binaries from [GitHub Releases](https://github.com/rossigee/fetch-k8s-cert/releases)
+
+### From Source
+
+```bash
+git clone https://github.com/rossigee/fetch-k8s-cert.git
+cd fetch-k8s-cert
+make build
+./build/fetch-k8s-cert --version
+```
+
+## Configuration
+
+Create a YAML configuration file with the required fields:
+
+```yaml
+# URL of the Kubernetes API
+k8sAPIURL: https://your.cluster.address:6443
+
+# Path to the CA file for the K8S API server (optional)
+k8sCACertFile: /etc/pki/tls/ca.crt
+
+# Skip TLS verification (not recommended for production)
+skipTLSVerification: false
+
+# Base64-encoded authentication token (or use $TOKEN env var)
+token: jwt_token_from_service_account
+
+# Kubernetes namespace where the certificate is located
+namespace: default
+
+# Name of the secret resource containing the certificate
+secretName: my-cert
+
+# Local file paths (must be absolute paths)
+localCAFile: /etc/pki/tls/ca.pem          # Optional
+localCertFile: /etc/pki/tls/cert.pem      # Required
+localKeyFile: /etc/pki/tls/key.pem        # Required
+
+# Command to trigger after certificate update (optional)
+reloadCommand: "systemctl reload nginx"
+
+# Extract intermediate CA from certificate chain (optional, default: false)
+useIntermediateCA: false
+
+# HTTP client timeout in seconds (optional, default: 30)
+httpClientTimeout: 30
+
+# Observability configuration (optional)
+observability:
+  logLevel: info
+  enableMetrics: true
+  metricsPort: 8080
+  enableTracing: false
+```
+
+### Environment Variables
+
+You can reference environment variables in your config:
+
+```yaml
+token: ${K8S_TOKEN}          # Resolves to environment variable
+k8sAPIURL: ${K8S_API_URL}
+```
+
+Or pass the token base64-encoded directly:
+
+```yaml
+token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+## Installation
+
+## Kubernetes Setup
+
+This section assumes you have `cert-manager` installed and configured with an `Issuer` or `ClusterIssuer`. To make certificates available to `fetch-k8s-cert`:
+
+1. Create a `Certificate` resource
+2. Create a `ServiceAccount` with read permissions
+3. Create the service account token secret
+4. Point `fetch-k8s-cert` to the certificate secret
+
+### Example: Create Certificate and ServiceAccount
+
+Assuming you're using `cert-manager`, create a `Certificate` resource (via Flux, ArgoCD, or direct apply), and a `ServiceAccount` that can read the resulting TLS `Secret`. For example:
 
 ```yaml
 ---
@@ -98,56 +247,23 @@ kubectl -n yournamespace get secret myservice-sa -ojsonpath='{.data.token}' | ba
 
 Confirm the JWT service account token has access to retrieve the TLS secret:
 
-```bash
-kubectl --token=$(cat /tmp/jwt-token) -n yournamespace get secret myservice-sa -ojsonpath='{.data.token}' | base64 -d;echo
-```
+### Extract Service Account Token
 
-Next, create a configuration file in YAML format with the following fields:
-
-```yaml
-# URL of the Kubernetes API
-k8sAPIURL: https://your.cluster.address:6443
-
-# Path to the CA file for the K8S API server
-k8sCACertFile: /etc/pki/tls/ca.crt
-
-# Enable to skip TLS verification of the K8S API server
-skipTLSVerification: true
-
-# Base64-encoded authentication token
-token: jwt_token_from_service_account
-
-# Kubernetes namespace where the certificate is located
-namespace: yournamespace
-
-# Name of the secret resource containing the certificate details
-secretName: service-tls
-
-# Path to the local TLS files.
-localCAFile: /etc/pki/tls/service-ca.pem
-localCertFile: /etc/pki/tls/service-cert.pem
-localKeyFile: /etc/pki/tls/service-key.pem
-
-# Command to trigger a service reload.
-# NOTE: If the service using the certificate knows when the certificate files have been updated and can reload them itself, the `reloadCommand` is largely unnecessary. However, if the service needs to be restarted manually when a new certificate is deployed, the `reloadCommand` could be used to `systemctl restart yourservice`. The `fetch-k8s-cert` tool has been designed to be run as 'non-root', so you may also need to add `sudo` and configure `sudoers` if restarting the service requires elevated privileges, or take other measures if running in a Docker container.
-reloadCommand: "echo 'The cert changed.'"
-
-# Extract intermediate CA from certificate chain instead of using ca.crt
-# This is useful when the service needs the intermediate CA that actually issued 
-# the server certificate, rather than the root CA stored in the secret's ca.crt field.
-# Default: false (uses ca.crt field)
-useIntermediateCA: false
-```
-
-You could run try running this locally...
+Get the JWT token for use in your config:
 
 ```bash
-./fetch-k8s-cert -f config.yaml
+kubectl -n yournamespace get secret myservice-sa -ojsonpath='{.data.token}' | base64 -d > /tmp/jwt-token
 ```
 
-Typically, you would be deploying this either as a 'systemd' service or as a Docker container in `docker-compose`.
+Verify the token has access:
 
-### Watch Mode
+```bash
+kubectl --token=$(cat /tmp/jwt-token) -n yournamespace get secret service-tls
+```
+
+## Daemon Modes
+
+### Watch Mode (Recommended)
 
 Instead of re-running the fetch on a schedule (timer, cron, or a wrapping shell loop), the tool can stay resident and react to changes **as they happen**. An idle watcher makes no periodic Kubernetes API calls; secrets are seen via the Kubernetes watch stream, and the process re-syncs on every connect (the ServiceAccount needs `list` and `watch` verbs on secrets in addition to `get`, see the RBAC example above).
 
@@ -175,7 +291,10 @@ The periodic re-sync (default 24h) is a convergence net, not a poll loop: on eac
 | `-v` | Verbose logging |
 | `--version` | Print version |
 
-Run as a systemd service:
+### Running as a Service
+
+**systemd service:**
+
 ```ini
 [Unit]
 Description=fetch-k8s-cert watch
@@ -186,43 +305,39 @@ ExecStart=/usr/local/bin/fetch-k8s-cert -w -d /etc/fetch-k8s-cert/conf.d
 Restart=always
 ```
 
-As a Docker container:
-```yaml
-cert-fetcher:
-  image: ghcr.io/rossigee/fetch-k8s-cert:3.0.0
-  command: ["-w", "-d", "/etc/fetch-k8s-cert"]
-  volumes:
-    - ./config:/etc/fetch-k8s-cert
-    - ./certs:/etc/ssl/certs
-  restart: always
+Enable and start:
+
+```bash
+sudo systemctl enable fetch-k8s-cert
+sudo systemctl start fetch-k8s-cert
+sudo systemctl status fetch-k8s-cert
 ```
 
-### Debian Package Installation on Ubuntu
+**Docker Compose:**
 
-1. **Install the Package**
-   ```bash
-   sudo apt update
-   sudo apt install ./fetch-k8s-cert_3.1.1_amd64.deb
-   ```
+```yaml
+services:
+  cert-fetcher:
+    image: ghcr.io/rossigee/fetch-k8s-cert:latest
+    command: ["-w", "-d", "/etc/fetch-k8s-cert"]
+    volumes:
+      - ./config:/etc/fetch-k8s-cert
+      - ./certs:/etc/ssl/certs
+    restart: always
+```
 
-2. **Configure the Tool**
-   - Put your configuration file in place at `/etc/fetch-k8s-cert/config.yaml`.
-   - Set appropriate permissions:
-     ```bash
-     sudo chown root:root /etc/fetch-k8s-cert/config.yaml
-     sudo chmod 600 /etc/fetch-k8s-cert/config.yaml
-     ```
+### Command-Line Flags
 
-3. **Run the Service**
-   - Enable and start the systemd service:
-     ```bash
-     sudo systemctl enable fetch-k8s-cert
-     sudo systemctl start fetch-k8s-cert
-     ```
-   - Verify the service is running:
-     ```bash
-     sudo systemctl status fetch-k8s-cert
-     ```
+| Flag | Description |
+|------|-------------|
+| `-f <file>` | Single configuration file |
+| `-d <dir>` | Directory of `*.yaml` config files, one per secret |
+| `-w` | Watch mode: long-running, event-driven |
+| `-p` | Polling mode: fetch on startup, then re-fetch on interval |
+| `--poll-interval <dur>` | Polling interval (default: 20m) |
+| `--resync <dur>` | Safety-net re-sync interval in watch mode (default: 24h, use `0` to disable) |
+| `-v` | Verbose logging (info level) |
+| `--version` | Print version and exit |
 
 ### Docker Compose Setup with Nginx
 
@@ -609,6 +724,25 @@ Set up alerts on these key metrics:
 - Reduce log level to `warn` or `error`
 - Disable structured logging if not needed
 - Adjust sampling to `tracingSampling: 0.1` for 10% of traces
+
+## Resources
+
+### Documentation
+- **[Examples](../examples/)** — Configuration templates and systemd setup
+- **[Changelog](CHANGELOG.md)** — Release history and breaking changes
+- **[GitHub Issues](https://github.com/rossigee/fetch-k8s-cert/issues)** — Bug reports and feature requests
+
+### External Resources
+- **[cert-manager Documentation](https://cert-manager.io/)** — Official cert-manager docs
+- **[cert-manager Webhook Guide](https://cert-manager.io/docs/concepts/webhook/)** — Custom CA setup
+- **[Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)** — K8s secrets documentation
+- **[OpenTelemetry](https://opentelemetry.io/)** — Distributed tracing framework
+- **[Prometheus](https://prometheus.io/)** — Metrics collection and visualization
+
+### Getting Help
+- **[GitHub Discussions](https://github.com/rossigee/fetch-k8s-cert/discussions)** — Ask questions and get help
+- **[GitHub Issues](https://github.com/rossigee/fetch-k8s-cert/issues)** — Report bugs or request features
+- **[Contributing](https://github.com/rossigee/fetch-k8s-cert/blob/master/CONTRIBUTING.md)** — Contributing guidelines
 
 ## Development
 
